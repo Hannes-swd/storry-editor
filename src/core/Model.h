@@ -127,11 +127,7 @@ struct Connection {
     long long endTime = 0;
     std::string blockId;  // optional block membership
 
-    // Bequemlichkeit fuer den Graph und aeltere Projekte
-    const std::string& source() const { return members.size() > 0 ? members[0] : empty(); }
-    const std::string& target() const { return members.size() > 1 ? members[1] : empty(); }
     bool has(const std::string& elementId) const;
-    static const std::string& empty();
 };
 
 struct Block {

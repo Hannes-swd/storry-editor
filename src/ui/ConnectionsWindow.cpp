@@ -40,18 +40,6 @@ ConnState& state() {
     return s;
 }
 
-ImVec4 edgeColorFor(const std::string& type) {
-    ColorScheme& c = theme::colors();
-    if (iequalsContains(type, "enemy") || iequalsContains(type, "conflict") ||
-        iequalsContains(type, "feind"))
-        return c.errorColor;
-    if (iequalsContains(type, "married") || iequalsContains(type, "friend") ||
-        iequalsContains(type, "ally") || iequalsContains(type, "freund"))
-        return c.successColor;
-    if (iequalsContains(type, "owns") || iequalsContains(type, "guards")) return c.warningColor;
-    return c.edgeColor;
-}
-
 void ensurePositions(Editor& ed, const std::vector<const Element*>& nodes, const ImVec2& canvas) {
     int missing = 0;
     for (const Element* el : nodes) {
@@ -295,7 +283,6 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
         }
         if (blk && blk->collapsed) continue;
 
-        const ConnectionType* ctype = ed.project.connectionType(conn.typeId);
         const std::string typeName = ed.project.connectionTypeName(conn);
         std::vector<ImVec2> points;
         for (const std::string& m : conn.members) {
@@ -304,7 +291,7 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
         }
         if (points.size() < 2) continue;
 
-        ImVec4 col = (ctype && ctype->colorExplicit) ? ctype->color : edgeColorFor(typeName);
+        ImVec4 col = ed.project.connectionTypeColor(conn.typeId);
 
         // Mehr als zwei Rollen: Sternform mit Knotenpunkt in der Mitte
         if (points.size() > 2) {
@@ -382,6 +369,30 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
         ImVec2 ts = ImGui::CalcTextSize(el->name.c_str());
         dl->AddText(ImVec2(p.x - ts.x * 0.5f, p.y + r + 3.0f), theme::u32(c.textPrimary),
                     el->name.c_str());
+
+        // Was gilt gerade? Zeitliche Verbindungen unter dem Namen anzeigen.
+        float lineY = p.y + r + 3.0f + ts.y;
+        const long long when = st.useTimeSlider ? st.sliderTime : 0;
+        for (const ConnectionType& type : ed.project.connectionTypes) {
+            if (!type.temporal) continue;
+            const size_t bandRole = static_cast<size_t>(type.bandRole < 0 ? 0 : type.bandRole);
+            const size_t labelRole = static_cast<size_t>(type.labelRole < 0 ? 0 : type.labelRole);
+            for (const Connection& conn : ed.project.connections) {
+                if (conn.typeId != type.id) continue;
+                if (bandRole >= conn.members.size() || conn.members[bandRole] != el->id) continue;
+                if (st.useTimeSlider && !ed.project.connectionActiveAt(conn, when)) continue;
+                if (!st.useTimeSlider && conn.hasEnd) continue;  // ohne Schieber nur das Aktuelle
+                std::string target = labelRole < conn.members.size()
+                                         ? ed.project.displayName(conn.members[labelRole])
+                                         : std::string();
+                std::string line = type.name + ": " + target;
+                ImVec2 lts = ImGui::CalcTextSize(line.c_str());
+                dl->AddText(ImVec2(p.x - lts.x * 0.5f, lineY),
+                            theme::u32(ed.project.connectionTypeColor(type.id)), line.c_str());
+                lineY += lts.y;
+                break;  // pro Typ eine Zeile
+            }
+        }
     }
 
     if (!hoveredNode.empty()) {
@@ -489,6 +500,9 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
     if (nodes.empty())
         dl->AddText(ImVec2(canvasPos.x + 20.0f, canvasPos.y + 20.0f), theme::u32(c.textSecondary),
                     TR("Keine Elemente vorhanden."));
+    else if (ed.project.connectionTypes.empty())
+        dl->AddText(ImVec2(canvasPos.x + 20.0f, canvasPos.y + 20.0f), theme::u32(c.textSecondary),
+                    TR("Zuerst einen Verbindungstyp anlegen."));
     else
         dl->AddText(ImVec2(canvasPos.x + 8.0f, canvasPos.y + canvasSize.y - 20.0f),
                     theme::u32(c.textSecondary),

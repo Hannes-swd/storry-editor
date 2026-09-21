@@ -66,6 +66,40 @@ themes. The automatically assigned group colours adapt their saturation and brig
 
 Every single colour can be adjusted below; **Reload theme** restores the selected preset.
 
+## Connections: your own templates with roles
+
+The program knows no built-in notions like "person" or "place" - connections are defined by you
+too. Under **Connections → "Manage types…"** you create a template:
+
+```
+Name:     person at place
+Role 1:   Person  →  group Characters   (or "all groups")
+Role 2:   Place   →  group Locations
+          any number of further roles
+
+[x] Can be set on the timeline (temporal)
+    [x] only one at a time per element
+    [x] draw a band in the timeline
+    Band runs in the track of: Person    Labelled with: Place
+```
+
+Each role only offers elements from its allowed groups. **Temporal** types have a "from" and an
+optional "until"; with **exclusive** types the previous setting ends automatically when a new one
+starts - that is a whereabouts feature without the program ever knowing the word "place".
+
+It shows up in three places:
+
+- **Timeline:** a coloured band behind the track, labelled with the other end
+  (`▓ Castle ▓│▓ Forest ▓│▓ Castle →`). Right click a track to set a new connection, click the
+  band to select it. **"Bands"** toggles types on and off.
+- **Connections graph:** each circle shows what currently applies (`person at place: Castle`).
+  Types with more than two roles are drawn as a star with a hub. The **"State on day N"** slider
+  shows the relations at a point in time.
+- **Details:** roles, period and the elements of the selected connection.
+
+Projects from an older version keep loading: the former free-text `type` becomes a type with two
+roles, `source`/`target` become those roles, and date fields are parsed.
+
 ## Custom entries instead of fixed choices
 
 Wherever a dropdown offers a list, the defaults are only a starting point – every dropdown has a
@@ -78,7 +112,7 @@ stored in `metadata.json`:
 | Action dialog → Storyline | storylines |
 | Action dialog → Tags | free text, `Existing…` offers tags already in use |
 | Action dialog → Mutations → Field | a new field name creates the field on the element |
-| Connection dialog → Type | relation types (married_to, … + your own) |
+| Connection dialog → Type | connection types (your own templates with roles, see above) |
 | Connection dialog → Block | a new name creates the block |
 | Element fields of type Enum | a new option lands in the template of the defining group |
 | Template editor → Field | field name, description and enum options are free anyway |

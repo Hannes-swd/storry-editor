@@ -66,6 +66,42 @@ ans Design an.
 Jede Einzelfarbe lässt sich darunter weiter anpassen; **Design neu laden**
 stellt das gewählte Preset wieder her. Die Wahl landet in `settings.json`.
 
+## Verbindungen: eigene Vorlagen mit Rollen
+
+Das Programm kennt keine festen Begriffe wie „Person" oder „Ort" – auch Verbindungen definierst
+du selbst. Unter **Connections → „Typen verwalten…"** entsteht eine Vorlage:
+
+```
+Name:     Person an Ort
+Rolle 1:  Person  →  Gruppe Characters   (oder "alle Gruppen")
+Rolle 2:  Ort     →  Gruppe Locations
+          beliebig viele weitere Rollen möglich
+
+[x] Über die Timeline setzbar (zeitlich)
+    [x] pro Element nur eine gleichzeitig
+    [x] Band in der Timeline zeichnen
+    Band läuft in der Spur von: Person    Beschriftet mit: Ort
+```
+
+Beim Setzen bietet jede Rolle nur Elemente aus den erlaubten Gruppen an. **Zeitliche** Typen
+haben ein „Ab" und optional ein „Bis"; bei **exklusiven** Typen endet die vorherige Setzung
+automatisch, sobald eine neue beginnt – damit ist ein Aufenthaltsort abgebildet, ohne dass das
+Programm je das Wort „Ort" kennt.
+
+Sichtbar wird das an drei Stellen:
+
+- **Timeline:** farbiges Band hinter der Spur, beschriftet mit dem anderen Ende
+  (`▓ Castle ▓│▓ Forest ▓│▓ Castle →`). Rechtsklick in einer Spur setzt eine neue Verbindung,
+  Klick aufs Band wählt sie aus. Über **„Bänder"** lassen sich Typen ein- und ausblenden.
+- **Connections-Graph:** unter jedem Kreis steht, was gerade gilt (`ist an Ort: Castle`).
+  Typen mit mehr als zwei Rollen werden als Stern mit Knotenpunkt gezeichnet. Der Schieber
+  **„Stand an Tag N"** zeigt die Beziehungslage zu einem Zeitpunkt.
+- **Details:** Rollen, Zeitraum und die beteiligten Elemente der gewählten Verbindung.
+
+Projekte aus einer älteren Version laden weiter: aus dem bisherigen Textfeld `type` entsteht
+automatisch ein Typ mit zwei Rollen, `source`/`target` werden die Rollen, Datumsfelder werden
+geparst.
+
 ## Eigene Einträge statt fester Auswahl
 
 Überall, wo eine Auswahlliste angeboten wird, sind die Vorgaben nur ein Startpunkt – jedes
@@ -78,7 +114,7 @@ Dropdown hat unten das Feld **„Eigener Eintrag"**, in das ein neuer Wert getip
 | Aktions-Dialog → Strang | Handlungsstränge |
 | Aktions-Dialog → Tags | frei tippbar, `Vorhandene…` bietet bereits benutzte Tags an |
 | Aktions-Dialog → Mutations → Feld | ein neuer Feldname legt das Feld direkt am Element an |
-| Verbindungs-Dialog → Typ | Beziehungstypen (married_to, … + eigene) |
+| Verbindungs-Dialog → Typ | Verbindungstypen (eigene Vorlagen mit Rollen, siehe oben) |
 | Verbindungs-Dialog → Block | ein neuer Name erzeugt den Block |
 | Element-Felder vom Typ Enum | neue Option landet im Template der definierenden Gruppe |
 | Template-Editor → Feld | Feldname, Beschreibung, Enum-Optionen sind ohnehin frei |

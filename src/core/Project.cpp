@@ -43,16 +43,16 @@ const ConnectionType* Project::connectionType(const std::string& id) const {
     return findById(connectionTypes, id);
 }
 
-ConnectionType* Project::connectionTypeByName(const std::string& name) {
+ConnectionType* Project::connectionTypeByName(const std::string& typeName) {
     for (ConnectionType& t : connectionTypes) {
-        if (t.name == name) return &t;
+        if (t.name == typeName) return &t;
     }
     return nullptr;
 }
 
-ConnectionType& Project::ensureConnectionType(const std::string& name) {
-    if (ConnectionType* existing = connectionTypeByName(name)) return *existing;
-    return addConnectionType(name);
+ConnectionType& Project::ensureConnectionType(const std::string& typeName) {
+    if (ConnectionType* existing = connectionTypeByName(typeName)) return *existing;
+    return addConnectionType(typeName);
 }
 
 std::string Project::connectionTypeName(const Connection& c) const {
@@ -283,6 +283,22 @@ ImVec4 Project::colorForId(const std::string& anyId) const {
     if (element(anyId)) return elementColor(anyId);
     if (group(anyId)) return groupColor(anyId);
     return ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
+}
+
+ImVec4 Project::connectionTypeColor(const std::string& typeId) const {
+    const ConnectionType* type = connectionType(typeId);
+    if (!type) return ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
+    if (type->colorExplicit) return type->color;
+    // eigener Farbkreis, gegen die Gruppenfarben versetzt
+    int index = 0;
+    for (const ConnectionType& t : connectionTypes) {
+        if (t.id == typeId) break;
+        ++index;
+    }
+    float sat = 0.62f, val = 0.72f;
+    groupPalette(&sat, &val);
+    float h = std::fmod(0.47f + 0.618033f * static_cast<float>(index), 1.0f);
+    return hsv(h, sat * 0.85f, val);
 }
 
 ImVec4 Project::autoColorForGroup(const std::string& parentId) const {
@@ -522,10 +538,10 @@ Connection& Project::addConnection(const std::string& typeId,
     return connections.back();
 }
 
-ConnectionType& Project::addConnectionType(const std::string& name) {
+ConnectionType& Project::addConnectionType(const std::string& typeName) {
     ConnectionType t;
     t.id = newId("ctype");
-    t.name = name;
+    t.name = typeName;
     t.roles.push_back({"A", {}});
     t.roles.push_back({"B", {}});
     connectionTypes.push_back(t);

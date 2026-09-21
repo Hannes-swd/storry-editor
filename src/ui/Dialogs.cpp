@@ -1430,11 +1430,16 @@ void openEditAction(Editor& ed, const std::string& actionId) {
 }
 
 void openNewConnection(Editor& ed, const std::string& src, const std::string& dst) {
+    if (ed.project.connectionTypes.empty()) {
+        // Ohne Vorlage gibt es nichts zu setzen - also gleich eine anlegen.
+        ed.setStatus(TR("Zuerst einen Verbindungstyp anlegen."));
+        openNewConnectionType(ed);
+        return;
+    }
     ConnectionDialog& st = ed.dialogs.connection;
     st = ConnectionDialog{};
     st.open = true;
     st.isNew = true;
-    if (ed.project.connectionTypes.empty()) return;
     const ConnectionType& type = ed.project.connectionTypes.front();
     st.draft.typeId = type.id;
     st.draft.members.assign(type.roles.size(), std::string());

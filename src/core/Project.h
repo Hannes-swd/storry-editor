@@ -41,9 +41,9 @@ struct Project {
     Block* block(const std::string& id);
     ConnectionType* connectionType(const std::string& id);
     const ConnectionType* connectionType(const std::string& id) const;
-    ConnectionType* connectionTypeByName(const std::string& name);
+    ConnectionType* connectionTypeByName(const std::string& typeName);
     // Legt bei Bedarf einen einfachen Typ mit zwei Rollen an (Altbestand, Import).
-    ConnectionType& ensureConnectionType(const std::string& name);
+    ConnectionType& ensureConnectionType(const std::string& typeName);
     std::string connectionTypeName(const Connection& c) const;
 
     Group* findGroupByPath(const std::string& path);
@@ -72,6 +72,8 @@ struct Project {
     ImVec4 groupColor(const std::string& groupId) const;
     ImVec4 elementColor(const std::string& elementId) const;
     ImVec4 colorForId(const std::string& anyId) const;  // element or group
+    // Farbe eines Verbindungstyps: eigene Farbe oder automatisch vergeben.
+    ImVec4 connectionTypeColor(const std::string& typeId) const;
 
     // ----------------------------------------------------------- queries
     std::vector<const Action*> sortedActions() const;
@@ -103,7 +105,7 @@ struct Project {
     Element& addElement(const std::string& elementName, const std::string& groupId);
     Action& addAction(const std::string& title, long long time);
     Connection& addConnection(const std::string& typeId, const std::vector<std::string>& members);
-    ConnectionType& addConnectionType(const std::string& name);
+    ConnectionType& addConnectionType(const std::string& typeName);
     void removeConnectionType(const std::string& id);
     Block& addBlock(const std::string& blockName);
 
