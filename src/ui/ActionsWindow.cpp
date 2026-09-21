@@ -150,7 +150,6 @@ void drawActionsWindow(Editor& ed, bool* open) {
     }
 
     ActionsState& st = state();
-    ColorScheme& c = theme::colors();
 
     // ------------------------------------------------------------ filter bar
     if (ImGui::Button("+ Neue Aktion")) dialogs::openNewAction(ed, 0, "");
@@ -159,7 +158,7 @@ void drawActionsWindow(Editor& ed, bool* open) {
     ImGui::InputTextWithHint("##search", "Volltextsuche...", &st.search);
     ImGui::SameLine();
     bool elementFilterActive = !st.elementFilter.empty();
-    if (elementFilterActive) ImGui::PushStyleColor(ImGuiCol_Button, c.accentColor);
+    if (elementFilterActive) ImGui::PushStyleColor(ImGuiCol_Button, theme::accentFill());
     if (ImGui::Button("Beteiligte filtern")) ImGui::OpenPopup("act_elements");
     if (elementFilterActive) ImGui::PopStyleColor();
     if (ImGui::BeginPopup("act_elements")) {

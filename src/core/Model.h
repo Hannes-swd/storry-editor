@@ -120,4 +120,9 @@ std::string listToValue(const std::vector<std::string>& items);
 
 std::string defaultValueFor(const FieldDef& f);
 
+// Saettigung/Helligkeit der automatisch vergebenen Gruppenfarben. Wird vom
+// Theme gesetzt, damit die Farben auf hellem und dunklem Grund sitzen.
+void setGroupPalette(float saturation, float value);
+void groupPalette(float* saturation, float* value);
+
 }  // namespace se

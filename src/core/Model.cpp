@@ -146,6 +146,21 @@ std::string listToValue(const std::vector<std::string>& items) {
     return j.dump();
 }
 
+namespace {
+float g_groupSaturation = 0.70f;
+float g_groupValue = 0.66f;
+}  // namespace
+
+void setGroupPalette(float saturation, float value) {
+    g_groupSaturation = saturation;
+    g_groupValue = value;
+}
+
+void groupPalette(float* saturation, float* value) {
+    if (saturation) *saturation = g_groupSaturation;
+    if (value) *value = g_groupValue;
+}
+
 std::string defaultValueFor(const FieldDef& f) {
     if (!f.defaultValue.empty()) return f.defaultValue;
     switch (f.type) {

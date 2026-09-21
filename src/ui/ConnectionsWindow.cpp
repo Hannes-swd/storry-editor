@@ -150,7 +150,7 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
     }
     ImGui::SameLine();
     bool filterActive = !st.typeFilter.empty();
-    if (filterActive) ImGui::PushStyleColor(ImGuiCol_Button, c.accentColor);
+    if (filterActive) ImGui::PushStyleColor(ImGuiCol_Button, theme::accentFill());
     if (ImGui::Button("Typ-Filter")) ImGui::OpenPopup("conn_types");
     if (filterActive) ImGui::PopStyleColor();
     if (ImGui::BeginPopup("conn_types")) {

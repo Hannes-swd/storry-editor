@@ -199,8 +199,6 @@ void buildRows(Editor& ed, TimelineState& st, const std::string& parentId, int d
 }
 
 void drawFilterBar(Editor& ed, TimelineState& st) {
-    ColorScheme& c = theme::colors();
-
     int unitCount = 0;
     const char* const* units = timeUnitLabels(&unitCount);
     int unitIndex = static_cast<int>(st.unit);
@@ -219,7 +217,7 @@ void drawFilterBar(Editor& ed, TimelineState& st) {
 
     ImGui::SameLine();
     bool groupFilterActive = !st.groupFilter.empty();
-    if (groupFilterActive) ImGui::PushStyleColor(ImGuiCol_Button, c.accentColor);
+    if (groupFilterActive) ImGui::PushStyleColor(ImGuiCol_Button, theme::accentFill());
     if (ImGui::Button("Gruppen-Filter")) ImGui::OpenPopup("tl_groups");
     if (groupFilterActive) ImGui::PopStyleColor();
     if (ImGui::BeginPopup("tl_groups")) {
@@ -247,7 +245,7 @@ void drawFilterBar(Editor& ed, TimelineState& st) {
 
     // second row: the filters
     bool typeFilterActive = !st.typeFilter.empty();
-    if (typeFilterActive) ImGui::PushStyleColor(ImGuiCol_Button, c.accentColor);
+    if (typeFilterActive) ImGui::PushStyleColor(ImGuiCol_Button, theme::accentFill());
     if (ImGui::Button("Typ-Filter")) ImGui::OpenPopup("tl_types");
     if (typeFilterActive) ImGui::PopStyleColor();
     if (ImGui::BeginPopup("tl_types")) {

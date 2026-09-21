@@ -33,8 +33,13 @@ struct ColorScheme {
     std::map<std::string, ImVec4> groupColors;  // optional per group overrides
 };
 
+// Zwei mitgelieferte Farbwelten: hell (Standard) und ein neutrales Dunkel -
+// beide ohne Blaustich, die Akzentfarbe ist ein Grauton.
+enum class ThemePreset { Light, Dark };
+
 struct AppSettings {
     ColorScheme colors;
+    ThemePreset preset = ThemePreset::Light;
     float fontSize = 17.0f;
     float timelineTrackHeight = 30.0f;
     float timelineHeaderWidth = 210.0f;
@@ -62,12 +67,19 @@ namespace theme {
 AppSettings& settings();
 ColorScheme& colors();
 
-void resetToDefault();
+void resetToDefault();          // = applyPreset(ThemePreset::Light)
+void applyPreset(ThemePreset preset);
+const char* presetName(ThemePreset preset);
 void applyImGuiStyle();
 bool load();
 bool save();
 
 ImU32 u32(const ImVec4& c, float alphaScale = 1.0f);
+ImVec4 mix(const ImVec4& a, const ImVec4& b, float t);
+// Fuellfarbe fuer hervorgehobene Schaltflaechen (aktive Filter o.ae.), die in
+// beiden Themes genug Kontrast zur Textfarbe behaelt.
+ImVec4 accentFill();
+bool isLightTheme();
 ImVec4 lighten(const ImVec4& c, float amount);
 ImVec4 darken(const ImVec4& c, float amount);
 ImVec4 withAlpha(const ImVec4& c, float a);

@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include "app/Platform.h"
+#include "core/Model.h"
 
 using nlohmann::json;
 
@@ -24,6 +25,11 @@ ImVec4 colorFromJson(const json& j, const ImVec4& fallback) {
 
 std::string configFile() { return platform::appConfigDir() + "/settings.json"; }
 
+ImVec4 rgb(int r, int g, int b, float a = 1.0f) {
+    return ImVec4(static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
+                  static_cast<float>(b) / 255.0f, a);
+}
+
 }  // namespace
 
 AppSettings& settings() {
@@ -36,27 +42,60 @@ AppSettings& settings() {
 
 ColorScheme& colors() { return settings().colors; }
 
-void resetToDefault() {
+void resetToDefault() { applyPreset(ThemePreset::Light); }
+
+const char* presetName(ThemePreset preset) {
+    return preset == ThemePreset::Light ? "Hell" : "Dunkel";
+}
+
+void applyPreset(ThemePreset preset) {
     g_initialised = true;
+    g_settings.preset = preset;
     ColorScheme& c = g_settings.colors;
-    c.textPrimary = ImVec4(0.92f, 0.93f, 0.95f, 1.00f);
-    c.textSecondary = ImVec4(0.62f, 0.65f, 0.70f, 1.00f);
-    c.backgroundColor = ImVec4(0.11f, 0.12f, 0.14f, 1.00f);
-    c.panelBackground = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
-    c.accentColor = ImVec4(0.29f, 0.56f, 0.89f, 1.00f);  // #4A90E2
-    c.warningColor = ImVec4(0.96f, 0.65f, 0.14f, 1.00f);  // #F5A623
-    c.successColor = ImVec4(0.49f, 0.83f, 0.13f, 1.00f);  // #7ED321
-    c.errorColor = ImVec4(0.82f, 0.01f, 0.11f, 1.00f);    // #D0021B
-    c.timelineBackground = ImVec4(0.13f, 0.14f, 0.17f, 1.00f);
-    c.timelineGrid = ImVec4(0.26f, 0.28f, 0.33f, 1.00f);
-    c.timelineTrackAlt = ImVec4(0.17f, 0.18f, 0.22f, 1.00f);
-    c.timelineRuler = ImVec4(0.72f, 0.75f, 0.80f, 1.00f);
-    c.selectionColor = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
-    c.hoverColor = ImVec4(1.00f, 0.95f, 0.70f, 1.00f);
-    c.ghostColor = ImVec4(1.00f, 1.00f, 1.00f, 0.35f);
-    c.edgeColor = ImVec4(0.58f, 0.62f, 0.70f, 1.00f);
-    c.nodeOutline = ImVec4(0.08f, 0.09f, 0.11f, 1.00f);
-    c.blockColor = ImVec4(0.45f, 0.40f, 0.75f, 1.00f);
+
+    if (preset == ThemePreset::Light) {
+        // Papierweiss mit Graphit-Akzent - kein Blaustich.
+        c.textPrimary = rgb(0x22, 0x22, 0x26);
+        c.textSecondary = rgb(0x6E, 0x6E, 0x76);
+        c.backgroundColor = rgb(0xF2, 0xF2, 0xEF);
+        c.panelBackground = rgb(0xFF, 0xFF, 0xFF);
+        c.accentColor = rgb(0x4E, 0x4E, 0x57);
+        c.warningColor = rgb(0xC1, 0x7A, 0x0A);
+        c.successColor = rgb(0x3E, 0x8E, 0x2F);
+        c.errorColor = rgb(0xC0, 0x2A, 0x24);
+        c.timelineBackground = rgb(0xFA, 0xFA, 0xF7);
+        c.timelineGrid = rgb(0xD5, 0xD5, 0xCE);
+        c.timelineTrackAlt = rgb(0xEC, 0xEC, 0xE7);
+        c.timelineRuler = rgb(0x55, 0x55, 0x5C);
+        c.selectionColor = rgb(0x1E, 0x1E, 0x22);
+        c.hoverColor = rgb(0xA8, 0x72, 0x00);
+        c.ghostColor = ImVec4(0.12f, 0.12f, 0.14f, 0.35f);
+        c.edgeColor = rgb(0x70, 0x70, 0x78);
+        c.nodeOutline = rgb(0x3A, 0x3A, 0x42);
+        c.blockColor = rgb(0x6B, 0x66, 0x8C);
+        setGroupPalette(0.70f, 0.66f);  // kraeftigere Gruppenfarben auf Weiss
+    } else {
+        // Neutrales Dunkelgrau mit weisser Schrift - ebenfalls ohne Blau.
+        c.textPrimary = rgb(0xF2, 0xF2, 0xF4);
+        c.textSecondary = rgb(0x9C, 0x9C, 0xA4);
+        c.backgroundColor = rgb(0x14, 0x14, 0x16);
+        c.panelBackground = rgb(0x1E, 0x1E, 0x21);
+        c.accentColor = rgb(0xC4, 0xC4, 0xCC);
+        c.warningColor = rgb(0xE0, 0xA3, 0x3E);
+        c.successColor = rgb(0x7F, 0xC4, 0x6A);
+        c.errorColor = rgb(0xE0, 0x56, 0x4E);
+        c.timelineBackground = rgb(0x17, 0x17, 0x1A);
+        c.timelineGrid = rgb(0x3A, 0x3A, 0x40);
+        c.timelineTrackAlt = rgb(0x21, 0x21, 0x25);
+        c.timelineRuler = rgb(0xC8, 0xC8, 0xD0);
+        c.selectionColor = rgb(0xFF, 0xFF, 0xFF);
+        c.hoverColor = rgb(0xFF, 0xE2, 0xA8);
+        c.ghostColor = ImVec4(1.0f, 1.0f, 1.0f, 0.35f);
+        c.edgeColor = rgb(0x9A, 0x9A, 0xA4);
+        c.nodeOutline = rgb(0x0C, 0x0C, 0x0E);
+        c.blockColor = rgb(0x9B, 0x96, 0xBE);
+        setGroupPalette(0.55f, 0.80f);
+    }
     c.groupColors.clear();
 }
 
@@ -64,6 +103,18 @@ ImU32 u32(const ImVec4& c, float alphaScale) {
     ImVec4 col = c;
     col.w *= alphaScale;
     return ImGui::ColorConvertFloat4ToU32(col);
+}
+
+ImVec4 mix(const ImVec4& a, const ImVec4& b, float t) {
+    return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t,
+                  a.w + (b.w - a.w) * t);
+}
+
+bool isLightTheme() { return isBright(colors().backgroundColor); }
+
+ImVec4 accentFill() {
+    const ColorScheme& c = colors();
+    return mix(c.panelBackground, c.accentColor, isLightTheme() ? 0.38f : 0.55f);
 }
 
 ImVec4 lighten(const ImVec4& c, float amount) {
@@ -94,59 +145,73 @@ void applyImGuiStyle() {
     s.WindowTitleAlign = ImVec2(0.0f, 0.5f);
     s.WindowMenuButtonPosition = ImGuiDir_None;
 
+    // Interaktive Flaechen werden aus Panel + Akzent gemischt. Dadurch bleiben
+    // sie im hellen Theme hell (dunkle Schrift lesbar) und im dunklen dunkel
+    // (weisse Schrift lesbar) - ohne pro Theme eigene Regeln.
+    const bool light = isBright(c.backgroundColor);
+    const ImVec4 base = c.panelBackground;
+    auto tint = [&](float t) { return mix(base, c.accentColor, t); };
+    const ImVec4 surface = light ? mix(base, c.backgroundColor, 0.55f) : mix(base, c.accentColor, 0.06f);
+
     ImVec4* col = s.Colors;
     col[ImGuiCol_Text] = c.textPrimary;
     col[ImGuiCol_TextDisabled] = c.textSecondary;
     col[ImGuiCol_WindowBg] = c.backgroundColor;
     col[ImGuiCol_ChildBg] = withAlpha(c.panelBackground, 0.0f);
-    col[ImGuiCol_PopupBg] = darken(c.panelBackground, 0.03f);
-    col[ImGuiCol_Border] = withAlpha(c.textSecondary, 0.35f);
-    col[ImGuiCol_FrameBg] = c.panelBackground;
-    col[ImGuiCol_FrameBgHovered] = lighten(c.panelBackground, 0.06f);
-    col[ImGuiCol_FrameBgActive] = lighten(c.panelBackground, 0.12f);
-    col[ImGuiCol_TitleBg] = darken(c.panelBackground, 0.04f);
-    col[ImGuiCol_TitleBgActive] = darken(c.accentColor, 0.25f);
-    col[ImGuiCol_TitleBgCollapsed] = darken(c.panelBackground, 0.06f);
-    col[ImGuiCol_MenuBarBg] = darken(c.panelBackground, 0.02f);
-    col[ImGuiCol_ScrollbarBg] = withAlpha(c.backgroundColor, 0.6f);
-    col[ImGuiCol_ScrollbarGrab] = lighten(c.panelBackground, 0.10f);
-    col[ImGuiCol_ScrollbarGrabHovered] = lighten(c.panelBackground, 0.16f);
-    col[ImGuiCol_ScrollbarGrabActive] = c.accentColor;
+    col[ImGuiCol_PopupBg] = light ? base : mix(base, c.backgroundColor, 0.4f);
+    col[ImGuiCol_Border] = withAlpha(c.textSecondary, light ? 0.40f : 0.32f);
+    col[ImGuiCol_BorderShadow] = ImVec4(0, 0, 0, 0);
+    col[ImGuiCol_FrameBg] = surface;
+    col[ImGuiCol_FrameBgHovered] = tint(light ? 0.10f : 0.14f);
+    col[ImGuiCol_FrameBgActive] = tint(light ? 0.16f : 0.20f);
+    col[ImGuiCol_TitleBg] = mix(base, c.backgroundColor, 0.5f);
+    col[ImGuiCol_TitleBgActive] = tint(light ? 0.22f : 0.30f);
+    col[ImGuiCol_TitleBgCollapsed] = mix(base, c.backgroundColor, 0.7f);
+    col[ImGuiCol_MenuBarBg] = mix(base, c.backgroundColor, 0.35f);
+    col[ImGuiCol_ScrollbarBg] = withAlpha(c.backgroundColor, 0.5f);
+    col[ImGuiCol_ScrollbarGrab] = tint(0.22f);
+    col[ImGuiCol_ScrollbarGrabHovered] = tint(0.34f);
+    col[ImGuiCol_ScrollbarGrabActive] = tint(0.50f);
     col[ImGuiCol_CheckMark] = c.accentColor;
-    col[ImGuiCol_SliderGrab] = c.accentColor;
-    col[ImGuiCol_SliderGrabActive] = lighten(c.accentColor, 0.1f);
-    col[ImGuiCol_Button] = lighten(c.panelBackground, 0.05f);
-    col[ImGuiCol_ButtonHovered] = withAlpha(c.accentColor, 0.75f);
-    col[ImGuiCol_ButtonActive] = c.accentColor;
-    col[ImGuiCol_Header] = withAlpha(c.accentColor, 0.45f);
-    col[ImGuiCol_HeaderHovered] = withAlpha(c.accentColor, 0.65f);
-    col[ImGuiCol_HeaderActive] = c.accentColor;
-    col[ImGuiCol_Separator] = withAlpha(c.textSecondary, 0.30f);
-    col[ImGuiCol_SeparatorHovered] = c.accentColor;
-    col[ImGuiCol_SeparatorActive] = lighten(c.accentColor, 0.1f);
-    col[ImGuiCol_ResizeGrip] = withAlpha(c.accentColor, 0.35f);
-    col[ImGuiCol_ResizeGripHovered] = withAlpha(c.accentColor, 0.65f);
+    col[ImGuiCol_SliderGrab] = tint(0.55f);
+    col[ImGuiCol_SliderGrabActive] = tint(0.72f);
+    col[ImGuiCol_Button] = tint(light ? 0.12f : 0.16f);
+    col[ImGuiCol_ButtonHovered] = tint(light ? 0.26f : 0.32f);
+    col[ImGuiCol_ButtonActive] = tint(light ? 0.38f : 0.46f);
+    col[ImGuiCol_Header] = tint(light ? 0.18f : 0.24f);
+    col[ImGuiCol_HeaderHovered] = tint(light ? 0.28f : 0.34f);
+    col[ImGuiCol_HeaderActive] = tint(light ? 0.38f : 0.46f);
+    col[ImGuiCol_Separator] = withAlpha(c.textSecondary, 0.35f);
+    col[ImGuiCol_SeparatorHovered] = withAlpha(c.textSecondary, 0.65f);
+    col[ImGuiCol_SeparatorActive] = c.accentColor;
+    col[ImGuiCol_ResizeGrip] = withAlpha(c.textSecondary, 0.30f);
+    col[ImGuiCol_ResizeGripHovered] = withAlpha(c.textSecondary, 0.60f);
     col[ImGuiCol_ResizeGripActive] = c.accentColor;
-    col[ImGuiCol_Tab] = darken(c.panelBackground, 0.02f);
-    col[ImGuiCol_TabHovered] = withAlpha(c.accentColor, 0.7f);
-    col[ImGuiCol_TabSelected] = darken(c.accentColor, 0.2f);
-    col[ImGuiCol_TabDimmed] = darken(c.panelBackground, 0.04f);
-    col[ImGuiCol_TabDimmedSelected] = darken(c.accentColor, 0.32f);
-    col[ImGuiCol_DockingPreview] = withAlpha(c.accentColor, 0.6f);
-    col[ImGuiCol_DockingEmptyBg] = darken(c.backgroundColor, 0.03f);
-    col[ImGuiCol_TableHeaderBg] = darken(c.panelBackground, 0.02f);
-    col[ImGuiCol_TableBorderStrong] = withAlpha(c.textSecondary, 0.4f);
+    col[ImGuiCol_Tab] = mix(base, c.backgroundColor, 0.55f);
+    col[ImGuiCol_TabHovered] = tint(light ? 0.24f : 0.30f);
+    col[ImGuiCol_TabSelected] = tint(light ? 0.16f : 0.22f);
+    col[ImGuiCol_TabSelectedOverline] = c.accentColor;
+    col[ImGuiCol_TabDimmed] = mix(base, c.backgroundColor, 0.75f);
+    col[ImGuiCol_TabDimmedSelected] = mix(base, c.backgroundColor, 0.35f);
+    col[ImGuiCol_TabDimmedSelectedOverline] = withAlpha(c.accentColor, 0.5f);
+    col[ImGuiCol_DockingPreview] = withAlpha(c.accentColor, 0.45f);
+    col[ImGuiCol_DockingEmptyBg] = mix(c.backgroundColor, base, 0.3f);
+    col[ImGuiCol_TableHeaderBg] = mix(base, c.backgroundColor, 0.45f);
+    col[ImGuiCol_TableBorderStrong] = withAlpha(c.textSecondary, 0.45f);
     col[ImGuiCol_TableBorderLight] = withAlpha(c.textSecondary, 0.22f);
     col[ImGuiCol_TableRowBg] = withAlpha(c.panelBackground, 0.0f);
-    col[ImGuiCol_TableRowBgAlt] = withAlpha(c.panelBackground, 0.45f);
-    col[ImGuiCol_TextSelectedBg] = withAlpha(c.accentColor, 0.45f);
+    col[ImGuiCol_TableRowBgAlt] = light ? withAlpha(c.textSecondary, 0.07f)
+                                        : withAlpha(c.accentColor, 0.05f);
+    col[ImGuiCol_TextSelectedBg] = withAlpha(c.accentColor, light ? 0.28f : 0.40f);
     col[ImGuiCol_NavCursor] = c.accentColor;
-    col[ImGuiCol_ModalWindowDimBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.55f);
+    col[ImGuiCol_ModalWindowDimBg] = light ? ImVec4(0.15f, 0.15f, 0.16f, 0.35f)
+                                           : ImVec4(0.0f, 0.0f, 0.0f, 0.55f);
 }
 
 bool save() {
     AppSettings& s = settings();
     json j;
+    j["preset"] = presetName(s.preset);
     j["font_size"] = s.fontSize;
     j["timeline"] = {{"track_height", s.timelineTrackHeight},
                      {"header_width", s.timelineHeaderWidth},
@@ -201,6 +266,12 @@ bool load() {
         return false;
     }
 
+    // Dateien aus einer Version vor den Designs ("preset" fehlt) bringen noch die
+    // alte dunkelblaue Palette mit - die wird verworfen, damit das neue helle
+    // Standarddesign greift.
+    const bool hasPreset = j.contains("preset");
+    const std::string preset = j.value("preset", std::string("Hell"));
+    applyPreset(preset == "Dunkel" ? ThemePreset::Dark : ThemePreset::Light);
     s.fontSize = j.value("font_size", s.fontSize);
     if (j.contains("timeline")) {
         const json& t = j["timeline"];
@@ -224,7 +295,7 @@ bool load() {
         s.showDetails = w.value("details", s.showDetails);
         s.showSettings = w.value("settings", s.showSettings);
     }
-    if (j.contains("colors")) {
+    if (hasPreset && j.contains("colors")) {
         const json& jc = j["colors"];
         ColorScheme& c = s.colors;
         c.textPrimary = colorFromJson(jc.value("text_primary", json()), c.textPrimary);

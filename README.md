@@ -35,7 +35,24 @@ Kommandozeile:
 | **Story Visualizer** | 3.3 | Read-only-Chronik: Tagesüberschriften, „… vergehen“-Lücken, Attribut-Änderungen, Filter nach Element/Strang/Wichtigkeit |
 | **Connections** | 3.4 | Netzwerkgraph, Knoten ziehen, Kanten mit Typ-Label und Pfeil, Blöcke (gruppierte Verbindungen), Fokus auf ein Element mit Grad 1–3, Typ-Filter |
 | **Dateimanager** | 3.6 | Strukturierte Ansicht (Gruppen → Dateien) und rohe Vault-Ansicht, Upload (Dialog oder Drag & Drop aus dem Explorer), Umbenennen/Verschieben/Löschen, Bildvorschau, Datei mit Element verknüpfen |
-| **Einstellungen** | 2.3 / 7.1 | Alle Farben des Farbschemas, Gruppenfarben, Timeline-Parameter, Verwaltung der eigenen Listen; gespeichert in `%APPDATA%/StoryEditor/settings.json` |
+| **Einstellungen** | 2.3 / 7.1 | Design (Hell/Dunkel), alle Farben des Farbschemas, Gruppenfarben, Timeline-Parameter, Verwaltung der eigenen Listen; gespeichert in `%APPDATA%/StoryEditor/settings.json` |
+
+## Design
+
+Zwei mitgelieferte Farbwelten, umschaltbar über **Ansicht → Design** oder
+**Einstellungen → Farben**:
+
+- **Hell** (Standard): Papierweiße Flächen, dunkle Schrift, Graphit als Akzent
+- **Dunkel**: neutrales Dunkelgrau mit weißer Schrift
+
+Beide kommen ohne Blaustich aus – die Akzentfarbe ist in beiden Fällen ein
+Grauton. Interaktive Flächen (Buttons, Tabs, Header) werden aus Panel- und
+Akzentfarbe gemischt, deshalb bleibt die Schrift in beiden Designs lesbar.
+Die automatisch vergebenen Gruppenfarben passen ihre Sättigung und Helligkeit
+ans Design an.
+
+Jede Einzelfarbe lässt sich darunter weiter anpassen; **Design neu laden**
+stellt das gewählte Preset wieder her. Die Wahl landet in `settings.json`.
 
 ## Eigene Einträge statt fester Auswahl
 

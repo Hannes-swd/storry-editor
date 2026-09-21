@@ -288,6 +288,21 @@ void Editor::drawMainMenuBar() {
     }
 
     if (ImGui::BeginMenu("Ansicht")) {
+        if (ImGui::BeginMenu("Design")) {
+            if (ImGui::MenuItem("Hell", nullptr, s.preset == ThemePreset::Light)) {
+                theme::applyPreset(ThemePreset::Light);
+                theme::applyImGuiStyle();
+                theme::save();
+                setStatus("Helles Design aktiv.");
+            }
+            if (ImGui::MenuItem("Dunkel", nullptr, s.preset == ThemePreset::Dark)) {
+                theme::applyPreset(ThemePreset::Dark);
+                theme::applyImGuiStyle();
+                theme::save();
+                setStatus("Dunkles Design aktiv.");
+            }
+            ImGui::EndMenu();
+        }
         ImGui::MenuItem("Einstellungen / Farben", nullptr, &s.showSettings);
         if (ImGui::MenuItem("Layout zuruecksetzen")) {
             ImGui::ClearIniSettings();
@@ -523,6 +538,25 @@ void drawSettingsWindow(Editor& ed, bool* open) {
     ColorScheme& c = s.colors;
 
     if (ImGui::CollapsingHeader("Farben", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::TextUnformatted("Design");
+        bool lightActive = s.preset == ThemePreset::Light;
+        if (ImGui::RadioButton("Hell", lightActive)) {
+            theme::applyPreset(ThemePreset::Light);
+            theme::applyImGuiStyle();
+            theme::save();
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Dunkel", !lightActive)) {
+            theme::applyPreset(ThemePreset::Dark);
+            theme::applyImGuiStyle();
+            theme::save();
+        }
+        ImGui::SameLine();
+        ui::helpMarker(
+            "Setzt alle Farben auf das gewaehlte Design zurueck. Einzelne Farben lassen sich "
+            "darunter weiter anpassen.");
+        ImGui::Separator();
+
         struct Entry {
             const char* label;
             ImVec4* color;
@@ -557,11 +591,13 @@ void drawSettingsWindow(Editor& ed, bool* open) {
             theme::applyImGuiStyle();
             theme::save();
         }
-        if (ImGui::Button("Standard wiederherstellen")) {
-            theme::resetToDefault();
+        if (ImGui::Button("Design neu laden")) {
+            theme::applyPreset(s.preset);
             theme::applyImGuiStyle();
             theme::save();
+            ed.setStatus(std::string("Design \"") + theme::presetName(s.preset) + "\" zurueckgesetzt.");
         }
+        ui::tooltip("Verwirft eigene Farbaenderungen und stellt das gewaehlte Design wieder her.");
     }
 
     if (ImGui::CollapsingHeader("Gruppen-Farben", ImGuiTreeNodeFlags_DefaultOpen)) {

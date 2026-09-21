@@ -186,8 +186,10 @@ ImVec4 Project::groupColor(const std::string& groupId) const {
                 ++index;
             }
         }
-        float h = std::fmod(0.11f + 0.618033f * static_cast<float>(index), 1.0f);
-        return hsv(h, 0.62f, 0.82f);
+        float h = std::fmod(0.02f + 0.618033f * static_cast<float>(index), 1.0f);
+        float sat = 0.62f, val = 0.82f;
+        groupPalette(&sat, &val);
+        return hsv(h, sat, val);
     }
 
     // sub groups keep the parent hue but shift value/saturation so that they
@@ -226,8 +228,10 @@ ImVec4 Project::autoColorForGroup(const std::string& parentId) const {
         for (const auto& g : groups) {
             if (g.parentId.empty()) ++count;
         }
-        float h = std::fmod(0.11f + 0.618033f * static_cast<float>(count), 1.0f);
-        return hsv(h, 0.62f, 0.82f);
+        float h = std::fmod(0.02f + 0.618033f * static_cast<float>(count), 1.0f);
+        float sat = 0.62f, val = 0.82f;
+        groupPalette(&sat, &val);
+        return hsv(h, sat, val);
     }
     ImVec4 base = groupColor(parentId);
     float h = 0, s = 0, v = 0;
