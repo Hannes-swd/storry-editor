@@ -12,6 +12,7 @@
 #include "core/VaultIO.h"
 #include "ui/Dialogs.h"
 #include "ui/Editor.h"
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 #include "ui/UiCommon.h"
 #include "ui/Windows.h"
@@ -56,14 +57,14 @@ void copyInto(Editor& ed, const std::string& sourceAbs, const std::string& targe
     platform::ensureDir(vault::absolutePath(ed.project, targetDirRel), nullptr);
     fs::copy_file(src, platform::fsPath(targetAbs), fs::copy_options::overwrite_existing, ec);
     if (ec)
-        ed.setStatus("Konnte Datei nicht kopieren: " + sourceAbs, true);
+        ed.setStatus(TR("Konnte Datei nicht kopieren: ") + sourceAbs, true);
     else
-        ed.setStatus("Datei hinzugefuegt: " + targetRel);
+        ed.setStatus(TR("Datei hinzugefuegt: ") + targetRel);
 }
 
 void drawPreview(Editor& ed, FileManagerState& st) {
     if (st.selected.empty()) {
-        ui::textSecondary("Keine Datei ausgewaehlt.");
+        ui::textSecondary(TR("Keine Datei ausgewaehlt."));
         return;
     }
     std::string abs = vault::absolutePath(ed.project, st.selected);
@@ -71,11 +72,11 @@ void drawPreview(Editor& ed, FileManagerState& st) {
     ui::textSecondary(st.selected.c_str());
     ImGui::Separator();
 
-    if (ImGui::Button("Im Explorer oeffnen")) platform::openInShell(abs);
+    if (ImGui::Button(TR("Im Explorer oeffnen"))) platform::openInShell(abs);
     ImGui::SameLine();
-    if (ImGui::Button("Umbenennen")) {
+    if (ImGui::Button(TR("Umbenennen"))) {
         std::string rel = st.selected;
-        dialogs::prompt(ed, "Datei umbenennen", "Neuer Name", fileName(rel),
+        dialogs::prompt(ed, TR("Datei umbenennen"), TR("Neuer Name"), fileName(rel),
                         [&ed, rel](const std::string& value) {
                             if (value.empty()) return;
                             std::error_code ec;
@@ -84,37 +85,37 @@ void drawPreview(Editor& ed, FileManagerState& st) {
                             fs::rename(platform::fsPath(vault::absolutePath(ed.project, rel)),
                                        platform::fsPath(vault::absolutePath(ed.project, target)), ec);
                             if (ec)
-                                ed.setStatus("Umbenennen fehlgeschlagen.", true);
+                                ed.setStatus(TR("Umbenennen fehlgeschlagen."), true);
                             else
-                                ed.setStatus("Umbenannt in " + value);
+                                ed.setStatus(TR("Umbenannt in ") + value);
                         });
     }
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Button, theme::withAlpha(theme::colors().errorColor, 0.7f));
-    if (ImGui::Button("Loeschen")) {
+    if (ImGui::Button(TR("Loeschen"))) {
         std::string rel = st.selected;
         std::string details;
         if (rel.size() > 3 && rel.substr(rel.size() - 3) == ".md")
-            details = "Achtung: .md-Dateien gehoeren zu Elementen. Loeschen kann Verweise brechen.";
-        dialogs::confirm(ed, "Datei loeschen", "\"" + fileName(rel) + "\" wirklich loeschen?", details,
+            details = TR("Achtung: .md-Dateien gehoeren zu Elementen. Loeschen kann Verweise brechen.");
+        dialogs::confirm(ed, TR("Datei loeschen"), "\"" + fileName(rel) + TR("\" wirklich loeschen?"), details,
                          [&ed, rel]() {
                              std::error_code ec;
                              fs::remove(platform::fsPath(vault::absolutePath(ed.project, rel)), ec);
-                             ed.setStatus(ec ? "Loeschen fehlgeschlagen." : "Datei geloescht.", !!ec);
+                             ed.setStatus(ec ? TR("Loeschen fehlgeschlagen.") : TR("Datei geloescht."), !!ec);
                              state().selected.clear();
                          });
     }
     ImGui::PopStyleColor();
 
     ImGui::Spacing();
-    ImGui::TextUnformatted("Mit Element verknuepfen:");
+    ImGui::TextUnformatted(TR("Mit Element verknuepfen:"));
     ImGui::SetNextItemWidth(220.0f);
     ui::elementCombo(ed, "##linkel", st.linkElementId, true);
     ImGui::SameLine();
-    if (ImGui::Button("Verknuepfen") && !st.linkElementId.empty()) {
+    if (ImGui::Button(TR("Verknuepfen")) && !st.linkElementId.empty()) {
         Element* el = ed.project.element(st.linkElementId);
         if (el) {
-            ed.pushUndo("Datei verknuepft");
+            ed.pushUndo(TR("Datei verknuepft"));
             std::vector<std::string> list = listFromValue(el->values["attachments"]);
             if (std::find(list.begin(), list.end(), st.selected) == list.end())
                 list.push_back(st.selected);
@@ -123,7 +124,7 @@ void drawPreview(Editor& ed, FileManagerState& st) {
                 el->fieldOrder.end())
                 el->fieldOrder.push_back("attachments");
             ed.markElement(el->id);
-            ed.setStatus("Mit " + el->name + " verknuepft.");
+            ed.setStatus(TR("Mit ") + el->name + TR(" verknuepft."));
         }
     }
 
@@ -137,7 +138,7 @@ void drawPreview(Editor& ed, FileManagerState& st) {
             ImGui::Image(tex, ImVec2(static_cast<float>(w) * scale, static_cast<float>(h) * scale));
             ui::textSecondary((std::to_string(w) + " x " + std::to_string(h) + " px").c_str());
         } else {
-            ui::textSecondary("Bild konnte nicht geladen werden.");
+            ui::textSecondary(TR("Bild konnte nicht geladen werden."));
         }
         return;
     }
@@ -148,7 +149,7 @@ void drawPreview(Editor& ed, FileManagerState& st) {
         if (st.previewText.size() > 60000) st.previewText.resize(60000);
         st.previewLoaded = st.selected;
     }
-    ImGui::TextUnformatted("Rohinhalt (nur Ansicht):");
+    ImGui::TextUnformatted(TR("Rohinhalt (nur Ansicht):"));
     ImGui::InputTextMultiline("##raw", &st.previewText, ImVec2(-1, -1),
                               ImGuiInputTextFlags_ReadOnly);
 }
@@ -176,8 +177,8 @@ void drawStructured(Editor& ed, FileManagerState& st) {
     }
 
     ImGui::Separator();
-    const char* assetDirs[] = {"Assets/Images", "Assets/Documents", "Timeline", "Actions",
-                               "Connections"};
+    const char* assetDirs[] = {"Assets/Images", "Assets/Documents", TR("Timeline"), "Actions",
+                               TR("Connections")};
     for (const char* dir : assetDirs) {
         if (!ImGui::TreeNode(dir)) continue;
         std::error_code ec;
@@ -200,7 +201,7 @@ void drawStructured(Editor& ed, FileManagerState& st) {
 void drawRaw(Editor& ed, FileManagerState& st) {
     ImGui::TextUnformatted("/");
     ImGui::SameLine();
-    ui::textSecondary(st.currentDir.empty() ? "(Vault-Wurzel)" : st.currentDir.c_str());
+    ui::textSecondary(st.currentDir.empty() ? TR("(Vault-Wurzel)") : st.currentDir.c_str());
     if (!st.currentDir.empty()) {
         ImGui::SameLine();
         if (ImGui::SmallButton("..")) st.currentDir = parentDir(st.currentDir);
@@ -210,7 +211,7 @@ void drawRaw(Editor& ed, FileManagerState& st) {
     std::error_code ec;
     fs::path dirAbs = platform::fsPath(vault::absolutePath(ed.project, st.currentDir));
     if (!fs::exists(dirAbs, ec)) {
-        ui::textSecondary("Ordner existiert nicht.");
+        ui::textSecondary(TR("Ordner existiert nicht."));
         return;
     }
     std::vector<fs::directory_entry> dirs, files;
@@ -242,10 +243,10 @@ void drawRaw(Editor& ed, FileManagerState& st) {
         if (ImGui::Selectable(name.c_str(), st.selected == rel)) st.selected = rel;
         if (ImGui::BeginPopupContextItem()) {
             st.selected = rel;
-            if (ImGui::MenuItem("Oeffnen"))
+            if (ImGui::MenuItem(TR("Oeffnen")))
                 platform::openInShell(vault::absolutePath(ed.project, rel));
-            if (ImGui::MenuItem("Verschieben nach...")) {
-                dialogs::prompt(ed, "Datei verschieben", "Zielordner (relativ)", parentDir(rel),
+            if (ImGui::MenuItem(TR("Verschieben nach..."))) {
+                dialogs::prompt(ed, TR("Datei verschieben"), TR("Zielordner (relativ)"), parentDir(rel),
                                 [&ed, rel](const std::string& value) {
                                     std::error_code ec2;
                                     std::string target =
@@ -254,54 +255,54 @@ void drawRaw(Editor& ed, FileManagerState& st) {
                                     fs::rename(platform::fsPath(vault::absolutePath(ed.project, rel)),
                                                platform::fsPath(vault::absolutePath(ed.project, target)),
                                                ec2);
-                                    ed.setStatus(ec2 ? "Verschieben fehlgeschlagen."
-                                                     : "Verschoben nach " + target,
+                                    ed.setStatus(ec2 ? TR("Verschieben fehlgeschlagen.")
+                                                     : TR("Verschoben nach ") + target,
                                                  !!ec2);
                                 });
             }
             ImGui::EndPopup();
         }
     }
-    if (dirs.empty() && files.empty()) ui::textSecondary("Ordner ist leer.");
+    if (dirs.empty() && files.empty()) ui::textSecondary(TR("Ordner ist leer."));
 }
 
 }  // namespace
 
 void drawFileManagerWindow(Editor& ed, bool* open) {
     ImGui::SetNextWindowSize(ImVec2(820, 520), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Dateimanager", open)) {
+    if (!ImGui::Begin(TWIN("Dateimanager", "files"), open)) {
         ImGui::End();
         return;
     }
     if (!ed.project.loaded) {
-        ui::textSecondary("Kein Projekt geoeffnet.");
+        ui::textSecondary(TR("Kein Projekt geoeffnet."));
         ImGui::End();
         return;
     }
 
     FileManagerState& st = state();
 
-    if (ImGui::RadioButton("Strukturiert", !st.rawMode)) st.rawMode = false;
+    if (ImGui::RadioButton(TR("Strukturiert"), !st.rawMode)) st.rawMode = false;
     ImGui::SameLine();
-    if (ImGui::RadioButton("Rohe Dateien", st.rawMode)) st.rawMode = true;
+    if (ImGui::RadioButton(TR("Rohe Dateien"), st.rawMode)) st.rawMode = true;
     ImGui::SameLine();
-    if (ImGui::Button("Datei hochladen...")) {
-        std::vector<std::string> picked = platform::pickFiles("Dateien in den Vault kopieren");
+    if (ImGui::Button(TR("Datei hochladen..."))) {
+        std::vector<std::string> picked = platform::pickFiles(TR("Dateien in den Vault kopieren"));
         std::string target = st.rawMode ? st.currentDir : std::string("Assets/Images");
         for (const std::string& file : picked) copyInto(ed, file, target);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Neuer Ordner...")) {
+    if (ImGui::Button(TR("Neuer Ordner..."))) {
         std::string base = st.rawMode ? st.currentDir : std::string("Assets");
-        dialogs::prompt(ed, "Neuer Ordner", "Name", "", [&ed, base](const std::string& value) {
+        dialogs::prompt(ed, TR("Neuer Ordner"), "Name", "", [&ed, base](const std::string& value) {
             if (value.empty()) return;
             std::string rel = base.empty() ? value : base + "/" + value;
             platform::ensureDir(vault::absolutePath(ed.project, rel), nullptr);
-            ed.setStatus("Ordner erstellt: " + rel);
+            ed.setStatus(TR("Ordner erstellt: ") + rel);
         });
     }
     ImGui::SameLine();
-    if (ImGui::Button("Vault oeffnen")) platform::openInShell(ed.project.vaultPath);
+    if (ImGui::Button(TR("Vault oeffnen"))) platform::openInShell(ed.project.vaultPath);
 
     // files dropped from the explorer land in the current folder
     if (!ed.droppedFiles.empty()) {

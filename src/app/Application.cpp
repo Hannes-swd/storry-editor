@@ -13,6 +13,7 @@
 
 #include "app/Platform.h"
 #include "app/TextureCache.h"
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam,
@@ -190,14 +191,14 @@ void Application::drawDockspace() {
             ImGuiID bottomId =
                 ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Down, 0.42f, nullptr, &mainId);
 
-            ImGui::DockBuilderDockWindow("Gruppen-Manager", leftId);
-            ImGui::DockBuilderDockWindow("Details", rightId);
-            ImGui::DockBuilderDockWindow("Timeline", mainId);
-            ImGui::DockBuilderDockWindow("Aktionen", bottomId);
-            ImGui::DockBuilderDockWindow("Story Visualizer", bottomId);
-            ImGui::DockBuilderDockWindow("Connections", bottomId);
-            ImGui::DockBuilderDockWindow("Dateimanager", bottomId);
-            ImGui::DockBuilderDockWindow("Einstellungen", rightId);
+            ImGui::DockBuilderDockWindow("###groups", leftId);
+            ImGui::DockBuilderDockWindow("###details", rightId);
+            ImGui::DockBuilderDockWindow("###timeline", mainId);
+            ImGui::DockBuilderDockWindow("###actions", bottomId);
+            ImGui::DockBuilderDockWindow("###story", bottomId);
+            ImGui::DockBuilderDockWindow("###connections", bottomId);
+            ImGui::DockBuilderDockWindow("###files", bottomId);
+            ImGui::DockBuilderDockWindow("###settings", rightId);
             ImGui::DockBuilderFinish(dockspaceId);
         }
     }
@@ -207,6 +208,13 @@ void Application::drawDockspace() {
 
 int Application::run() {
     g_app = this;
+
+    // Erststart: Sprache aus der Windows-Anzeigesprache ableiten, danach
+    // entscheidet settings.json. / First run: take the language from Windows.
+    const LANGID uiLang = ::GetUserDefaultUILanguage();
+    theme::settings().language =
+        PRIMARYLANGID(uiLang) == LANG_GERMAN ? Language::German : Language::English;
+    lang::set(theme::settings().language);
 
     theme::load();  // the style itself is applied once the ImGui context exists
 
@@ -237,7 +245,8 @@ int Application::run() {
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     io.ConfigWindowsMoveFromTitleBarOnly = true;
 
-    static std::string iniPath = platform::appConfigDir() + "/imgui_layout.ini";
+    // v2: die Fenster haben feste ###-IDs bekommen, alte Layouts passen nicht mehr.
+    static std::string iniPath = platform::appConfigDir() + "/imgui_layout_v2.ini";
     io.IniFilename = iniPath.c_str();
 
     theme::applyImGuiStyle();

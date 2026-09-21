@@ -81,6 +81,7 @@ add_executable(StoryEditor WIN32
     src/core/VaultIO.cpp
     src/core/FileWatcher.cpp
     src/core/SelfTest.cpp
+    src/ui/Lang.cpp
     src/ui/Theme.cpp
     src/ui/UiCommon.cpp
     src/ui/Editor.cpp

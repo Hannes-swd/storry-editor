@@ -149,7 +149,12 @@ std::string listToValue(const std::vector<std::string>& items) {
 namespace {
 float g_groupSaturation = 0.70f;
 float g_groupValue = 0.66f;
+bool g_englishTexts = false;
 }  // namespace
+
+void setEnglishTexts(bool english) { g_englishTexts = english; }
+
+bool englishTexts() { return g_englishTexts; }
 
 void setGroupPalette(float saturation, float value) {
     g_groupSaturation = saturation;

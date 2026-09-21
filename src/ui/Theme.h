@@ -7,6 +7,8 @@
 
 #include "imgui.h"
 
+#include "ui/Lang.h"
+
 namespace se {
 
 struct ColorScheme {
@@ -40,6 +42,7 @@ enum class ThemePreset { Light, Dark };
 struct AppSettings {
     ColorScheme colors;
     ThemePreset preset = ThemePreset::Light;
+    Language language = Language::German;
     float fontSize = 17.0f;
     float timelineTrackHeight = 30.0f;
     float timelineHeaderWidth = 210.0f;

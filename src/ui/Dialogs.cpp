@@ -11,6 +11,7 @@
 #include "core/StoryTime.h"
 #include "core/VaultIO.h"
 #include "ui/Editor.h"
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 #include "ui/UiCommon.h"
 
@@ -33,30 +34,30 @@ void openModal(const char* title, bool open) {
 // --------------------------------------------------------------- project
 void drawNewProject(Editor& ed) {
     NewProjectDialog& st = ed.dialogs.newProject;
-    openModal("Neues Projekt", st.open);
-    if (!ImGui::BeginPopupModal("Neues Projekt", &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    openModal(TR("Neues Projekt"), st.open);
+    if (!ImGui::BeginPopupModal(TR("Neues Projekt"), &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
-    ImGui::TextUnformatted("Projektname");
+    ImGui::TextUnformatted(TR("Projektname"));
     ImGui::SetNextItemWidth(360.0f);
     ImGui::InputText("##name", &st.name);
-    ImGui::TextUnformatted("Speicherort (Obsidian-Vault)");
+    ImGui::TextUnformatted(TR("Speicherort (Obsidian-Vault)"));
     ImGui::SetNextItemWidth(360.0f);
     ImGui::InputText("##folder", &st.folder);
     ImGui::SameLine();
-    if (ImGui::Button("Waehlen...")) {
-        std::string picked = platform::pickFolder("Ordner fuer den Vault waehlen");
+    if (ImGui::Button(TR("Waehlen..."))) {
+        std::string picked = platform::pickFolder(TR("Ordner fuer den Vault waehlen"));
         if (!picked.empty()) st.folder = picked;
     }
-    ui::textSecondary("Es wird die Standard-Struktur (Characters, Locations, Objects, ...) angelegt.");
+    ui::textSecondary(TR("Es wird die Standard-Struktur (Characters, Locations, Objects, ...) angelegt."));
 
     ImGui::Separator();
     bool valid = !st.name.empty() && !st.folder.empty();
     if (!valid) ImGui::BeginDisabled();
-    if (ImGui::Button("Erstellen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Erstellen"), ImVec2(120, 0))) {
         std::string folder = st.folder;
         std::error_code ec;
         if (fs::exists(platform::fsPath(folder + "/metadata.json"), ec)) {
-            ed.setStatus("In diesem Ordner liegt bereits ein Projekt - es wird geoeffnet.", true);
+            ed.setStatus(TR("In diesem Ordner liegt bereits ein Projekt - es wird geoeffnet."), true);
             ed.openProject(folder);
         } else {
             ed.createProject(folder, st.name);
@@ -66,7 +67,7 @@ void drawNewProject(Editor& ed) {
     }
     if (!valid) ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
@@ -76,7 +77,7 @@ void drawNewProject(Editor& ed) {
 // ----------------------------------------------------------------- group
 void drawGroupDialog(Editor& ed) {
     GroupDialog& st = ed.dialogs.group;
-    const char* title = st.isNew ? "Neue Gruppe" : "Gruppe bearbeiten";
+    const char* title = st.isNew ? TR("Neue Gruppe") : TR("Gruppe bearbeiten");
     openModal(title, st.open);
     if (!ImGui::BeginPopupModal(title, &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
@@ -84,32 +85,32 @@ void drawGroupDialog(Editor& ed) {
     ImGui::SetNextItemWidth(320.0f);
     ImGui::InputText("##name", &st.name);
 
-    ImGui::TextUnformatted("Uebergeordnete Gruppe");
+    ImGui::TextUnformatted(TR("Uebergeordnete Gruppe"));
     ImGui::SetNextItemWidth(320.0f);
     ui::groupCombo(ed, "##parent", st.parentId, true, st.isNew ? std::string() : st.groupId);
 
-    ImGui::Checkbox("Eigene Farbe", &st.explicitColor);
+    ImGui::Checkbox(TR("Eigene Farbe"), &st.explicitColor);
     if (st.explicitColor) {
         ImGui::SameLine();
         ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&st.color),
                           ImGuiColorEditFlags_NoInputs);
     } else {
         ImGui::SameLine();
-        ui::textSecondary("Farbe wird automatisch aus der Elterngruppe abgeleitet.");
+        ui::textSecondary(TR("Farbe wird automatisch aus der Elterngruppe abgeleitet."));
     }
 
     ImGui::Separator();
     bool valid = !st.name.empty();
     if (!valid) ImGui::BeginDisabled();
-    if (ImGui::Button("Speichern", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Speichern"), ImVec2(120, 0))) {
         if (st.isNew) {
-            ed.pushUndo("Gruppe erstellt");
+            ed.pushUndo(TR("Gruppe erstellt"));
             Group& g = ed.project.addGroup(st.name, st.parentId);
             g.color = st.color;
             g.colorExplicit = st.explicitColor;
             ed.select(SelKind::Group, g.id);
         } else if (Group* g = ed.project.group(st.groupId)) {
-            ed.pushUndo("Gruppe bearbeitet");
+            ed.pushUndo(TR("Gruppe bearbeitet"));
             g->name = st.name;
             if (!ed.project.isAncestorGroup(st.groupId, st.parentId)) g->parentId = st.parentId;
             g->color = st.color;
@@ -124,7 +125,7 @@ void drawGroupDialog(Editor& ed) {
     }
     if (!valid) ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
@@ -134,11 +135,11 @@ void drawGroupDialog(Editor& ed) {
 // --------------------------------------------------------------- element
 void drawElementDialog(Editor& ed) {
     ElementDialog& st = ed.dialogs.element;
-    const char* title = st.isNew ? "Neues Element" : "Element bearbeiten";
+    const char* title = st.isNew ? TR("Neues Element") : TR("Element bearbeiten");
     openModal(title, st.open);
     if (!ImGui::BeginPopupModal(title, &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
-    ui::textSecondary(("Gruppe: " + ed.project.groupPath(st.groupId)).c_str());
+    ui::textSecondary((TR("Gruppe: ") + ed.project.groupPath(st.groupId)).c_str());
     ImGui::TextUnformatted("Name");
     ImGui::SetNextItemWidth(380.0f);
     ImGui::InputText("##name", &st.name);
@@ -152,7 +153,7 @@ void drawElementDialog(Editor& ed) {
         if (f.required) {
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().warningColor);
-            ImGui::TextUnformatted("* Pflicht");
+            ImGui::TextUnformatted(TR("* Pflicht"));
             ImGui::PopStyleColor();
         }
         std::string& value = st.values[f.name];
@@ -160,7 +161,7 @@ void drawElementDialog(Editor& ed) {
         ImGui::PopID();
         ImGui::Spacing();
     }
-    if (fields.empty()) ui::textSecondary("Diese Gruppe hat noch kein Template.");
+    if (fields.empty()) ui::textSecondary(TR("Diese Gruppe hat noch kein Template."));
     ImGui::EndChild();
 
     if (!st.error.empty()) {
@@ -170,16 +171,16 @@ void drawElementDialog(Editor& ed) {
     }
 
     ImGui::Separator();
-    if (ImGui::Button("Speichern", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Speichern"), ImVec2(120, 0))) {
         st.error.clear();
-        if (st.name.empty()) st.error = "Name darf nicht leer sein.";
+        if (st.name.empty()) st.error = TR("Name darf nicht leer sein.");
         for (const FieldDef& f : fields) {
             if (f.required && trim(st.values[f.name]).empty())
-                st.error = "Pflichtfeld \"" + f.name + "\" ist leer.";
+                st.error = TR("Pflichtfeld \"") + f.name + TR("\" ist leer.");
         }
         if (st.error.empty()) {
             if (st.isNew) {
-                ed.pushUndo("Element erstellt");
+                ed.pushUndo(TR("Element erstellt"));
                 Element& el = ed.project.addElement(st.name, st.groupId);
                 for (const auto& kv : st.values) el.values[kv.first] = kv.second;
                 if (el.values.count("name")) el.values["name"] = st.name;
@@ -188,7 +189,7 @@ void drawElementDialog(Editor& ed) {
                 ed.select(SelKind::Element, el.id);
                 ed.focusElementId = el.id;
             } else if (Element* el = ed.project.element(st.elementId)) {
-                ed.pushUndo("Element bearbeitet");
+                ed.pushUndo(TR("Element bearbeitet"));
                 for (const auto& kv : st.values) el->values[kv.first] = kv.second;
                 if (el->name != st.name) ed.renameElement(el->id, st.name);
                 if (el->values.count("name")) el->values["name"] = st.name;
@@ -200,7 +201,7 @@ void drawElementDialog(Editor& ed) {
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
@@ -210,38 +211,38 @@ void drawElementDialog(Editor& ed) {
 // -------------------------------------------------------------- template
 void drawFieldDialog(Editor& ed) {
     FieldDialog& st = ed.dialogs.field;
-    const char* title = st.isNew ? "Neues Feld" : "Feld bearbeiten";
+    const char* title = st.isNew ? TR("Neues Feld") : TR("Feld bearbeiten");
     openModal(title, st.open);
     if (!ImGui::BeginPopupModal(title, &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
-    ImGui::TextUnformatted("Feldname");
+    ImGui::TextUnformatted(TR("Feldname"));
     ImGui::SetNextItemWidth(320.0f);
-    ImGui::InputTextWithHint("##name", "z.B. age, birthday, status", &st.field.name);
+    ImGui::InputTextWithHint("##name", TR("z.B. age, birthday, status"), &st.field.name);
 
     int typeCount = 0;
     const char* const* labels = fieldTypeLabels(&typeCount);
     int typeIndex = static_cast<int>(st.field.type);
-    ImGui::TextUnformatted("Typ");
+    ImGui::TextUnformatted(TR("Typ"));
     ImGui::SetNextItemWidth(320.0f);
     if (ImGui::Combo("##type", &typeIndex, labels, typeCount))
         st.field.type = static_cast<FieldType>(typeIndex);
 
-    ImGui::Checkbox("Pflichtfeld", &st.field.required);
-    ui::helpMarker("Pflichtfelder muessen beim Anlegen eines Elements ausgefuellt werden.");
+    ImGui::Checkbox(TR("Pflichtfeld"), &st.field.required);
+    ui::helpMarker(TR("Pflichtfelder muessen beim Anlegen eines Elements ausgefuellt werden."));
 
-    ImGui::TextUnformatted("Standardwert");
+    ImGui::TextUnformatted(TR("Standardwert"));
     ImGui::SetNextItemWidth(320.0f);
     ImGui::InputText("##default", &st.field.defaultValue);
 
-    ImGui::TextUnformatted("Beschreibung / Hilfetext");
+    ImGui::TextUnformatted(TR("Beschreibung / Hilfetext"));
     ImGui::InputTextMultiline("##desc", &st.field.description, ImVec2(320, 54));
 
-    ImGui::TextUnformatted("Anzeigeformat (optional)");
+    ImGui::TextUnformatted(TR("Anzeigeformat (optional)"));
     ImGui::SetNextItemWidth(320.0f);
-    ImGui::InputTextWithHint("##format", "z.B. DD.MM.YYYY", &st.field.displayFormat);
+    ImGui::InputTextWithHint("##format", TR("z.B. DD.MM.YYYY"), &st.field.displayFormat);
 
     if (st.field.type == FieldType::Enum) {
-        ImGui::TextUnformatted("Auswahl-Optionen (eine pro Zeile)");
+        ImGui::TextUnformatted(TR("Auswahl-Optionen (eine pro Zeile)"));
         ImGui::InputTextMultiline("##enum", &st.enumOptions, ImVec2(320, 80));
     }
 
@@ -252,14 +253,14 @@ void drawFieldDialog(Editor& ed) {
     }
 
     ImGui::Separator();
-    if (ImGui::Button("Speichern", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Speichern"), ImVec2(120, 0))) {
         st.error.clear();
         st.field.name = trim(st.field.name);
-        if (st.field.name.empty()) st.error = "Feldname darf nicht leer sein.";
+        if (st.field.name.empty()) st.error = TR("Feldname darf nicht leer sein.");
         TemplateDialog& tpl = ed.dialogs.templateEditor;
         for (size_t i = 0; i < tpl.fields.size(); ++i) {
             if (static_cast<int>(i) == st.index) continue;
-            if (tpl.fields[i].name == st.field.name) st.error = "Feldname existiert bereits.";
+            if (tpl.fields[i].name == st.field.name) st.error = TR("Feldname existiert bereits.");
         }
         if (st.error.empty()) {
             st.field.enumOptions.clear();
@@ -276,7 +277,7 @@ void drawFieldDialog(Editor& ed) {
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
@@ -285,7 +286,7 @@ void drawFieldDialog(Editor& ed) {
 
 void drawTemplateDialog(Editor& ed) {
     TemplateDialog& st = ed.dialogs.templateEditor;
-    std::string title = "Template: " + ed.project.groupPath(st.groupId);
+    std::string title = TR("Template: ") + ed.project.groupPath(st.groupId);
     openModal(title.c_str(), st.open);
     if (ImGui::BeginPopupModal(title.c_str(), &st.open, ImGuiWindowFlags_AlwaysAutoResize)) {
         std::vector<FieldDef> inherited;
@@ -293,24 +294,24 @@ void drawTemplateDialog(Editor& ed) {
             for (const FieldDef& f : ed.project.effectiveFields(g->parentId)) inherited.push_back(f);
         }
         if (!inherited.empty()) {
-            ImGui::TextUnformatted("Geerbte Felder:");
+            ImGui::TextUnformatted(TR("Geerbte Felder:"));
             for (const FieldDef& f : inherited) {
                 ImGui::BulletText("%s  [%s]%s", f.name.c_str(), fieldTypeName(f.type),
-                                  f.required ? "  Pflicht" : "");
+                                  f.required ? TR("  Pflicht") : "");
             }
             ImGui::Separator();
         }
 
-        ImGui::TextUnformatted("Eigene Felder:");
+        ImGui::TextUnformatted(TR("Eigene Felder:"));
         int removeIndex = -1;
         for (size_t i = 0; i < st.fields.size(); ++i) {
             FieldDef& f = st.fields[i];
             ImGui::PushID(static_cast<int>(i));
             ImGui::Text("%-18s [Typ: %-9s] [Default: %s] %s", f.name.c_str(), fieldTypeName(f.type),
                         f.defaultValue.empty() ? "\"\"" : f.defaultValue.c_str(),
-                        f.required ? "[Pflicht]" : "");
+                        f.required ? TR("[Pflicht]") : "");
             ImGui::SameLine();
-            if (ImGui::SmallButton("Bearbeiten")) {
+            if (ImGui::SmallButton(TR("Bearbeiten"))) {
                 FieldDialog& fd = ed.dialogs.field;
                 fd.open = true;
                 fd.isNew = false;
@@ -320,13 +321,13 @@ void drawTemplateDialog(Editor& ed) {
                 fd.error.clear();
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Loeschen")) removeIndex = static_cast<int>(i);
+            if (ImGui::SmallButton(TR("Loeschen"))) removeIndex = static_cast<int>(i);
             ImGui::PopID();
         }
         if (removeIndex >= 0) st.fields.erase(st.fields.begin() + removeIndex);
-        if (st.fields.empty()) ui::textSecondary("Noch keine eigenen Felder.");
+        if (st.fields.empty()) ui::textSecondary(TR("Noch keine eigenen Felder."));
 
-        if (ImGui::Button("+ Neues Feld")) {
+        if (ImGui::Button(TR("+ Neues Feld"))) {
             FieldDialog& fd = ed.dialogs.field;
             fd.open = true;
             fd.isNew = true;
@@ -338,21 +339,21 @@ void drawTemplateDialog(Editor& ed) {
 
         ImGui::Separator();
         ui::textSecondary(
-            "Speichern ergaenzt fehlende Felder bei allen Elementen dieser Gruppe (inkl. Untergruppen).");
-        if (ImGui::Button("Alle speichern", ImVec2(140, 0))) {
+            TR("Speichern ergaenzt fehlende Felder bei allen Elementen dieser Gruppe (inkl. Untergruppen)."));
+        if (ImGui::Button(TR("Alle speichern"), ImVec2(140, 0))) {
             if (Group* g = ed.project.group(st.groupId)) {
-                ed.pushUndo("Template gespeichert");
+                ed.pushUndo(TR("Template gespeichert"));
                 g->fields = st.fields;
                 ed.project.applyTemplateToElements(st.groupId);
                 ed.markMetadata();
                 ed.markAllElements();
-                ed.setStatus("Template aktualisiert.");
+                ed.setStatus(TR("Template aktualisiert."));
             }
             st.open = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+        if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
             st.open = false;
             ImGui::CloseCurrentPopup();
         }
@@ -364,31 +365,31 @@ void drawTemplateDialog(Editor& ed) {
 // ---------------------------------------------------------------- action
 void drawActionDialog(Editor& ed) {
     ActionDialog& st = ed.dialogs.action;
-    const char* title = st.isNew ? "Neue Aktion" : "Aktion bearbeiten";
+    const char* title = st.isNew ? TR("Neue Aktion") : TR("Aktion bearbeiten");
     openModal(title, st.open);
     if (!ImGui::BeginPopupModal(title, &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
-    ImGui::TextUnformatted("Titel");
+    ImGui::TextUnformatted(TR("Titel"));
     ImGui::SetNextItemWidth(460.0f);
     ImGui::InputText("##title", &st.draft.title);
 
     bool listGrew = false;
     ImGui::SetNextItemWidth(220.0f);
-    ui::editableCombo("Typ", ed.project.actionTypes, st.draft.type, true, &listGrew);
-    ui::tooltip("Eigene Aktions-Typen koennen direkt im Dropdown angelegt werden.");
+    ui::editableCombo(TR("Typ"), ed.project.actionTypes, st.draft.type, true, &listGrew);
+    ui::tooltip(TR("Eigene Aktions-Typen koennen direkt im Dropdown angelegt werden."));
     ImGui::SameLine();
-    ImGui::Checkbox("wichtig (Major)", &st.draft.major);
+    ImGui::Checkbox(TR("wichtig (Major)"), &st.draft.major);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(160.0f);
-    ui::editableCombo("Strang", ed.project.storylines, st.draft.storyline, true, &listGrew);
-    ui::tooltip("Eigene Handlungsstraenge koennen direkt im Dropdown angelegt werden.");
+    ui::editableCombo(TR("Strang"), ed.project.storylines, st.draft.storyline, true, &listGrew);
+    ui::tooltip(TR("Eigene Handlungsstraenge koennen direkt im Dropdown angelegt werden."));
     if (listGrew) ed.markMetadata();
 
-    ImGui::TextUnformatted("Beschreibung / Szene");
+    ImGui::TextUnformatted(TR("Beschreibung / Szene"));
     ImGui::InputTextMultiline("##desc", &st.draft.description, ImVec2(460, 120));
 
     ImGui::Separator();
-    ImGui::Checkbox("Zeit relativ zu einer anderen Aktion", &st.draft.useRelative);
+    ImGui::Checkbox(TR("Zeit relativ zu einer anderen Aktion"), &st.draft.useRelative);
     if (st.draft.useRelative) {
         std::vector<std::string> titles;
         std::vector<std::string> ids;
@@ -402,7 +403,7 @@ void drawActionDialog(Editor& ed) {
             if (ids[i] == st.draft.relativeToId) current = titles[i];
         }
         ImGui::SetNextItemWidth(300.0f);
-        if (ui::comboStrings("Nach", titles, current, true)) {
+        if (ui::comboStrings(TR("Nach"), titles, current, true)) {
             st.draft.relativeToId.clear();
             for (size_t i = 0; i < titles.size(); ++i) {
                 if (titles[i] == current) st.draft.relativeToId = ids[i];
@@ -410,14 +411,14 @@ void drawActionDialog(Editor& ed) {
         }
         int minutes = static_cast<int>(st.draft.relativeOffset);
         ImGui::SetNextItemWidth(160.0f);
-        if (ImGui::InputInt("Minuten danach", &minutes)) st.draft.relativeOffset = minutes;
+        if (ImGui::InputInt(TR("Minuten danach"), &minutes)) st.draft.relativeOffset = minutes;
         const Action* ref = ed.project.action(st.draft.relativeToId);
         if (ref)
-            ui::textSecondary(("Ergibt: " + formatStoryTimeLong(ed.project.resolveActionTime(*ref) +
+            ui::textSecondary((TR("Ergibt: ") + formatStoryTimeLong(ed.project.resolveActionTime(*ref) +
                                                                st.draft.relativeOffset))
                                   .c_str());
     } else {
-        ImGui::TextUnformatted("Zeitpunkt");
+        ImGui::TextUnformatted(TR("Zeitpunkt"));
         ImGui::SetNextItemWidth(220.0f);
         ImGui::InputTextWithHint("##time", "Tag 5, 14:00", &st.timeText);
         long long parsed = 0;
@@ -428,32 +429,32 @@ void drawActionDialog(Editor& ed) {
             ImGui::PopStyleColor();
         } else {
             ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().warningColor);
-            ImGui::TextUnformatted("nicht lesbar");
+            ImGui::TextUnformatted(TR("nicht lesbar"));
             ImGui::PopStyleColor();
         }
     }
 
     ImGui::Separator();
-    ui::elementMultiSelect(ed, "Beteiligte Elemente (Charaktere, Orte, Objekte)", st.draft.elementIds,
+    ui::elementMultiSelect(ed, TR("Beteiligte Elemente (Charaktere, Orte, Objekte)"), st.draft.elementIds,
                            st.elementSearch, 140.0f);
 
-    ImGui::TextUnformatted("Tags (Komma getrennt, neue einfach eintippen)");
+    ImGui::TextUnformatted(TR("Tags (Komma getrennt, neue einfach eintippen)"));
     ui::tagPicker(ed, "##tags", st.tagsText);
 
-    if (ImGui::CollapsingHeader("Anhaenge")) {
+    if (ImGui::CollapsingHeader(TR("Anhaenge"))) {
         for (size_t i = 0; i < st.draft.attachments.size(); ++i) {
             ImGui::PushID(static_cast<int>(i));
             ImGui::TextUnformatted(st.draft.attachments[i].c_str());
             ImGui::SameLine();
-            if (ImGui::SmallButton("Entfernen")) {
+            if (ImGui::SmallButton(TR("Entfernen"))) {
                 st.draft.attachments.erase(st.draft.attachments.begin() + i);
                 ImGui::PopID();
                 break;
             }
             ImGui::PopID();
         }
-        if (ImGui::Button("Datei hinzufuegen...")) {
-            std::vector<std::string> picked = platform::pickFiles("Anhaenge waehlen");
+        if (ImGui::Button(TR("Datei hinzufuegen..."))) {
+            std::vector<std::string> picked = platform::pickFiles(TR("Anhaenge waehlen"));
             for (const std::string& file : picked) {
                 std::error_code ec;
                 fs::path src = platform::fsPath(file);
@@ -478,7 +479,7 @@ void drawActionDialog(Editor& ed) {
         }
     }
 
-    if (ImGui::CollapsingHeader("Attribut-Aenderungen (Mutations)")) {
+    if (ImGui::CollapsingHeader(TR("Attribut-Aenderungen (Mutations)"))) {
         int removeIndex = -1;
         for (size_t i = 0; i < st.draft.mutations.size(); ++i) {
             Mutation& m = st.draft.mutations[i];
@@ -521,7 +522,7 @@ void drawActionDialog(Editor& ed) {
             ImGui::PopID();
         }
         if (removeIndex >= 0) st.draft.mutations.erase(st.draft.mutations.begin() + removeIndex);
-        if (ImGui::Button("+ Aenderung")) {
+        if (ImGui::Button(TR("+ Aenderung"))) {
             Mutation m;
             if (!st.draft.elementIds.empty()) m.elementId = st.draft.elementIds.front();
             st.draft.mutations.push_back(m);
@@ -535,12 +536,12 @@ void drawActionDialog(Editor& ed) {
     }
 
     ImGui::Separator();
-    if (ImGui::Button("Speichern", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Speichern"), ImVec2(120, 0))) {
         st.error.clear();
-        if (trim(st.draft.title).empty()) st.error = "Titel darf nicht leer sein.";
+        if (trim(st.draft.title).empty()) st.error = TR("Titel darf nicht leer sein.");
         long long parsed = 0;
         if (!st.draft.useRelative && !parseStoryTime(st.timeText, &parsed))
-            st.error = "Zeitpunkt nicht lesbar (z.B. \"Tag 5, 14:00\").";
+            st.error = TR("Zeitpunkt nicht lesbar (z.B. \"Tag 5, 14:00\").");
         if (st.error.empty()) {
             st.draft.tags.clear();
             for (const std::string& part : splitString(st.tagsText, ',')) {
@@ -553,12 +554,12 @@ void drawActionDialog(Editor& ed) {
                 if (ref) st.draft.time = ed.project.resolveActionTime(*ref) + st.draft.relativeOffset;
             }
             if (st.isNew) {
-                ed.pushUndo("Aktion erstellt");
+                ed.pushUndo(TR("Aktion erstellt"));
                 st.draft.id = newId("act");
                 ed.project.actions.push_back(st.draft);
                 ed.select(SelKind::Action, st.draft.id);
             } else if (Action* a = ed.project.action(st.draft.id)) {
-                ed.pushUndo("Aktion bearbeitet");
+                ed.pushUndo(TR("Aktion bearbeitet"));
                 *a = st.draft;
             }
             if (!st.draft.storyline.empty() &&
@@ -573,7 +574,7 @@ void drawActionDialog(Editor& ed) {
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
@@ -583,27 +584,27 @@ void drawActionDialog(Editor& ed) {
 // ------------------------------------------------------------ connection
 void drawConnectionDialog(Editor& ed) {
     ConnectionDialog& st = ed.dialogs.connection;
-    const char* title = st.isNew ? "Verbindung erstellen" : "Verbindung bearbeiten";
+    const char* title = st.isNew ? TR("Verbindung erstellen") : TR("Verbindung bearbeiten");
     openModal(title, st.open);
     if (!ImGui::BeginPopupModal(title, &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
     ImGui::SetNextItemWidth(300.0f);
-    ui::elementCombo(ed, "Von", st.draft.sourceId, false);
+    ui::elementCombo(ed, TR("Von"), st.draft.sourceId, false);
     ImGui::SetNextItemWidth(300.0f);
-    ui::elementCombo(ed, "Nach", st.draft.targetId, false);
+    ui::elementCombo(ed, TR("Nach"), st.draft.targetId, false);
 
     bool typeAdded = false;
     ImGui::SetNextItemWidth(220.0f);
-    ui::editableCombo("Typ", ed.project.connectionTypes, st.draft.type, false, &typeAdded);
-    ui::tooltip("Eigene Beziehungstypen (z.B. mentor_of) koennen direkt im Dropdown angelegt werden.");
+    ui::editableCombo(TR("Typ"), ed.project.connectionTypes, st.draft.type, false, &typeAdded);
+    ui::tooltip(TR("Eigene Beziehungstypen (z.B. mentor_of) koennen direkt im Dropdown angelegt werden."));
     if (typeAdded) ed.markMetadata();
 
-    ImGui::TextUnformatted("Beschreibung");
+    ImGui::TextUnformatted(TR("Beschreibung"));
     ImGui::InputTextMultiline("##desc", &st.draft.description, ImVec2(360, 70));
     ImGui::SetNextItemWidth(160.0f);
-    ImGui::InputTextWithHint("Von (Zeit)", "Tag 1", &st.draft.startDate);
+    ImGui::InputTextWithHint(TR("Von (Zeit)"), "Tag 1", &st.draft.startDate);
     ImGui::SetNextItemWidth(160.0f);
-    ImGui::InputTextWithHint("Bis (Zeit)", "offen", &st.draft.endDate);
+    ImGui::InputTextWithHint(TR("Bis (Zeit)"), TR("offen"), &st.draft.endDate);
 
     {
         std::vector<std::string> names;
@@ -614,7 +615,7 @@ void drawConnectionDialog(Editor& ed) {
         }
         bool blockAdded = false;
         ImGui::SetNextItemWidth(220.0f);
-        if (ui::editableCombo("Block", names, current, true, &blockAdded)) {
+        if (ui::editableCombo(TR("Block"), names, current, true, &blockAdded)) {
             st.draft.blockId.clear();
             for (const Block& b : ed.project.blocks) {
                 if (b.name == current) st.draft.blockId = b.id;
@@ -626,20 +627,20 @@ void drawConnectionDialog(Editor& ed) {
                 ed.markConnections();
             }
         }
-        ui::tooltip("Bloecke fassen zusammengehoerende Verbindungen zusammen - hier auch neu anlegbar.");
+        ui::tooltip(TR("Bloecke fassen zusammengehoerende Verbindungen zusammen - hier auch neu anlegbar."));
     }
 
     ImGui::Separator();
     bool valid = !st.draft.sourceId.empty() && !st.draft.targetId.empty() &&
                  st.draft.sourceId != st.draft.targetId;
     if (!valid) ImGui::BeginDisabled();
-    if (ImGui::Button("Speichern", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Speichern"), ImVec2(120, 0))) {
         if (st.isNew) {
-            ed.pushUndo("Verbindung erstellt");
+            ed.pushUndo(TR("Verbindung erstellt"));
             st.draft.id = newId("conn");
             ed.project.connections.push_back(st.draft);
         } else if (Connection* conn = ed.project.connection(st.draft.id)) {
-            ed.pushUndo("Verbindung bearbeitet");
+            ed.pushUndo(TR("Verbindung bearbeitet"));
             *conn = st.draft;
         }
         ed.markConnections();
@@ -648,7 +649,7 @@ void drawConnectionDialog(Editor& ed) {
     }
     if (!valid) ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
@@ -657,16 +658,16 @@ void drawConnectionDialog(Editor& ed) {
 
 void drawBlockDialog(Editor& ed) {
     BlockDialog& st = ed.dialogs.block;
-    openModal("Block erstellen", st.open);
-    if (!ImGui::BeginPopupModal("Block erstellen", &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    openModal(TR("Block erstellen"), st.open);
+    if (!ImGui::BeginPopupModal(TR("Block erstellen"), &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
     ImGui::TextUnformatted("Name");
     ImGui::SetNextItemWidth(300.0f);
     ImGui::InputText("##name", &st.draft.name);
-    ImGui::TextUnformatted("Beschreibung");
+    ImGui::TextUnformatted(TR("Beschreibung"));
     ImGui::InputTextMultiline("##desc", &st.draft.description, ImVec2(300, 70));
 
-    ImGui::TextUnformatted("Enthaltene Verbindungen:");
+    ImGui::TextUnformatted(TR("Enthaltene Verbindungen:"));
     for (const std::string& id : st.connectionIds) {
         const Connection* conn = ed.project.connection(id);
         if (!conn) continue;
@@ -674,13 +675,13 @@ void drawBlockDialog(Editor& ed) {
                           conn->type.c_str(), ed.project.displayName(conn->targetId).c_str());
     }
     if (st.connectionIds.empty())
-        ui::textSecondary("Keine Verbindungen zwischen den markierten Knoten gefunden.");
+        ui::textSecondary(TR("Keine Verbindungen zwischen den markierten Knoten gefunden."));
 
     ImGui::Separator();
     bool valid = !trim(st.draft.name).empty();
     if (!valid) ImGui::BeginDisabled();
-    if (ImGui::Button("Speichern", ImVec2(120, 0))) {
-        ed.pushUndo("Block erstellt");
+    if (ImGui::Button(TR("Speichern"), ImVec2(120, 0))) {
+        ed.pushUndo(TR("Block erstellt"));
         Block& b = ed.project.addBlock(st.draft.name);
         b.description = st.draft.description;
         for (const std::string& id : st.connectionIds) {
@@ -692,7 +693,7 @@ void drawBlockDialog(Editor& ed) {
     }
     if (!valid) ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
@@ -702,25 +703,25 @@ void drawBlockDialog(Editor& ed) {
 // ------------------------------------------------------------ misc dialogs
 void drawMoveDialog(Editor& ed) {
     MoveDialog& st = ed.dialogs.move;
-    openModal("Element verschieben", st.open);
-    if (!ImGui::BeginPopupModal("Element verschieben", &st.open, ImGuiWindowFlags_AlwaysAutoResize))
+    openModal(TR("Element verschieben"), st.open);
+    if (!ImGui::BeginPopupModal(TR("Element verschieben"), &st.open, ImGuiWindowFlags_AlwaysAutoResize))
         return;
     const Element* el = ed.project.element(st.elementId);
     ui::textSecondary(el ? ed.project.elementPath(el->id).c_str() : "?");
     ImGui::SetNextItemWidth(320.0f);
-    ui::groupCombo(ed, "Zielgruppe", st.targetGroupId, false);
+    ui::groupCombo(ed, TR("Zielgruppe"), st.targetGroupId, false);
     ImGui::Separator();
     bool valid = !st.targetGroupId.empty();
     if (!valid) ImGui::BeginDisabled();
-    if (ImGui::Button("Verschieben", ImVec2(120, 0))) {
-        ed.pushUndo("Element verschoben");
+    if (ImGui::Button(TR("Verschieben"), ImVec2(120, 0))) {
+        ed.pushUndo(TR("Element verschoben"));
         ed.moveElement(st.elementId, st.targetGroupId);
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
     if (!valid) ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
@@ -729,8 +730,8 @@ void drawMoveDialog(Editor& ed) {
 
 void drawConfirmDialog(Editor& ed) {
     ConfirmDialog& st = ed.dialogs.confirm;
-    openModal(st.title.empty() ? "Bestaetigen" : st.title.c_str(), st.open);
-    const char* title = st.title.empty() ? "Bestaetigen" : st.title.c_str();
+    openModal(st.title.empty() ? TR("Bestaetigen") : st.title.c_str(), st.open);
+    const char* title = st.title.empty() ? TR("Bestaetigen") : st.title.c_str();
     if (!ImGui::BeginPopupModal(title, &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
     ImGui::TextWrapped("%s", st.message.c_str());
     if (!st.details.empty()) {
@@ -740,7 +741,7 @@ void drawConfirmDialog(Editor& ed) {
     }
     ImGui::Separator();
     ImGui::PushStyleColor(ImGuiCol_Button, theme::withAlpha(theme::colors().errorColor, 0.75f));
-    if (ImGui::Button("Ja, ausfuehren", ImVec2(140, 0))) {
+    if (ImGui::Button(TR("Ja, ausfuehren"), ImVec2(140, 0))) {
         if (st.onConfirm) st.onConfirm();
         st.open = false;
         st.onConfirm = nullptr;
@@ -748,7 +749,7 @@ void drawConfirmDialog(Editor& ed) {
     }
     ImGui::PopStyleColor();
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         st.onConfirm = nullptr;
         ImGui::CloseCurrentPopup();
@@ -758,7 +759,7 @@ void drawConfirmDialog(Editor& ed) {
 
 void drawPromptDialog(Editor& ed) {
     TextPromptDialog& st = ed.dialogs.prompt;
-    const char* title = st.title.empty() ? "Eingabe" : st.title.c_str();
+    const char* title = st.title.empty() ? TR("Eingabe") : st.title.c_str();
     openModal(title, st.open);
     if (!ImGui::BeginPopupModal(title, &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
     ImGui::TextUnformatted(st.label.c_str());
@@ -772,7 +773,7 @@ void drawPromptDialog(Editor& ed) {
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Abbrechen", ImVec2(120, 0))) {
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
         st.open = false;
         st.onAccept = nullptr;
         ImGui::CloseCurrentPopup();
@@ -782,20 +783,21 @@ void drawPromptDialog(Editor& ed) {
 
 void drawConflictDialog(Editor& ed) {
     ConflictDialog& st = ed.dialogs.conflict;
-    openModal("Externe Aenderung", st.open);
-    if (!ImGui::BeginPopupModal("Externe Aenderung", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    openModal(TR("Externe Aenderung"), st.open);
+    if (!ImGui::BeginPopupModal(TR("Externe Aenderung"), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
 
     Element* el = ed.project.element(st.change.elementId);
     ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().warningColor);
-    ImGui::TextWrapped("Die Datei \"%s\" wurde ausserhalb des Programms veraendert!",
+    ImGui::TextWrapped(TR("Die Datei \"%s\" wurde ausserhalb des Programms veraendert!"),
                        st.change.relativePath.c_str());
     ImGui::PopStyleColor();
-    ImGui::TextWrapped(
-        "Die Aenderung kann inkonsistent mit den Programm-Daten sein. .md-Dateien sollten nur ueber "
-        "die UI bearbeitet werden.");
+    ImGui::TextWrapped("%s%s",
+                       TR("Die Aenderung kann inkonsistent mit den Programm-Daten sein. .md-Dateien "
+                          "sollten nur ueber "),
+                       TR("die UI bearbeitet werden."));
     ImGui::Separator();
-    ImGui::TextUnformatted("Inhalt auf der Festplatte:");
+    ImGui::TextUnformatted(TR("Inhalt auf der Festplatte:"));
     ImGui::InputTextMultiline("##external", &st.externalText, ImVec2(560, 220),
                               ImGuiInputTextFlags_ReadOnly);
     ImGui::Separator();
@@ -807,7 +809,7 @@ void drawConflictDialog(Editor& ed) {
 
     if (ImGui::Button("Reload", ImVec2(120, 0))) {
         if (el) {
-            ed.pushUndo("Externe Datei geladen");
+            ed.pushUndo(TR("Externe Datei geladen"));
             std::vector<std::pair<std::string, std::string>> fields;
             std::string name, body;
             parseExternal(&fields, &name, &body);
@@ -821,16 +823,16 @@ void drawConflictDialog(Editor& ed) {
             el->body = body;
             ed.project.syncElementFields(*el);
             ed.markElement(el->id);
-            ed.setStatus("Externe Version uebernommen.");
+            ed.setStatus(TR("Externe Version uebernommen."));
         }
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
-    ui::tooltip("Verwirft die Daten im Programm und uebernimmt die Datei.");
+    ui::tooltip(TR("Verwirft die Daten im Programm und uebernimmt die Datei."));
     if (ImGui::Button("Merge", ImVec2(120, 0))) {
         if (el) {
-            ed.pushUndo("Externe Datei zusammengefuehrt");
+            ed.pushUndo(TR("Externe Datei zusammengefuehrt"));
             std::vector<std::pair<std::string, std::string>> fields;
             std::string name, body;
             parseExternal(&fields, &name, &body);
@@ -843,66 +845,67 @@ void drawConflictDialog(Editor& ed) {
             if (!body.empty()) el->body = body;
             ed.project.syncElementFields(*el);
             ed.markElement(el->id);
-            ed.setStatus("Zusammengefuehrt.");
+            ed.setStatus(TR("Zusammengefuehrt."));
         }
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
-    ui::tooltip("Uebernimmt externe Feldwerte, behaelt zusaetzliche Programm-Felder.");
+    ui::tooltip(TR("Uebernimmt externe Feldwerte, behaelt zusaetzliche Programm-Felder."));
     if (ImGui::Button("Cancel", ImVec2(120, 0))) {
         if (el) {
             ed.markElement(el->id);  // schreibt die interne Version zurueck
-            ed.setStatus("Externe Aenderung verworfen.");
+            ed.setStatus(TR("Externe Aenderung verworfen."));
         }
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
-    ui::tooltip("Ignoriert die externe Aenderung und schreibt die Programm-Daten zurueck.");
+    ui::tooltip(TR("Ignoriert die externe Aenderung und schreibt die Programm-Daten zurueck."));
     ImGui::EndPopup();
 }
 
 void drawAbout(Editor& ed) {
-    openModal("Ueber Story Editor", ed.dialogs.about);
-    if (ImGui::BeginPopupModal("Ueber Story Editor", &ed.dialogs.about,
+    openModal(TR("Ueber Story Editor"), ed.dialogs.about);
+    if (ImGui::BeginPopupModal(TR("Ueber Story Editor"), &ed.dialogs.about,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Story Editor " SE_VERSION);
-        ui::textSecondary("Schreib-Management fuer komplexe Geschichten.");
+        ui::textSecondary(TR("Schreib-Management fuer komplexe Geschichten."));
         ImGui::Separator();
         ImGui::TextUnformatted("C++17 + Dear ImGui (Win32/DirectX11)");
-        ImGui::TextUnformatted("Speicherung: Obsidian-Vault (Markdown + JSON)");
+        ImGui::TextUnformatted(TR("Speicherung: Obsidian-Vault (Markdown + JSON)"));
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().warningColor);
-        ImGui::TextWrapped(
-            "Wichtig: .md-Dateien werden ausschliesslich vom Programm geschrieben. Externe "
-            "Aenderungen werden erkannt und abgefragt.");
+        ImGui::TextWrapped("%s%s",
+                           TR("Wichtig: .md-Dateien werden ausschliesslich vom Programm "
+                              "geschrieben. Externe "),
+                           TR("Aenderungen werden erkannt und abgefragt."));
         ImGui::PopStyleColor();
-        if (ImGui::Button("Schliessen", ImVec2(120, 0))) {
+        if (ImGui::Button(TR("Schliessen"), ImVec2(120, 0))) {
             ed.dialogs.about = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     }
 
-    openModal("Tastenkuerzel", ed.dialogs.shortcuts);
-    if (ImGui::BeginPopupModal("Tastenkuerzel", &ed.dialogs.shortcuts,
+    openModal(TR("Tastenkuerzel"), ed.dialogs.shortcuts);
+    if (ImGui::BeginPopupModal(TR("Tastenkuerzel"), &ed.dialogs.shortcuts,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         struct Row {
             const char* keys;
             const char* what;
         };
         Row rows[] = {
-            {"Strg+N", "Neues Element"},
-            {"Strg+Shift+N", "Neues Projekt"},
-            {"Strg+G", "Neue Gruppe"},
-            {"Strg+T", "Neue Aktion"},
-            {"Strg+S", "Alles speichern"},
-            {"Strg+Z / Strg+Y", "Rueckgaengig / Wiederholen"},
-            {"Strg+Mausrad", "Timeline zoomen"},
-            {"Shift+Mausrad", "Timeline horizontal scrollen"},
-            {"Doppelklick Timeline", "Aktion anlegen / bearbeiten"},
-            {"Ziehen in Timeline", "Aktion zeitlich verschieben"},
+            {TR("Strg+N"), TR("Neues Element")},
+            {TR("Strg+Shift+N"), TR("Neues Projekt")},
+            {TR("Strg+G"), TR("Neue Gruppe")},
+            {TR("Strg+T"), TR("Neue Aktion")},
+            {TR("Strg+S"), TR("Alles speichern")},
+            {TR("Strg+Z / Strg+Y"), TR("Rueckgaengig / Wiederholen")},
+            {TR("Strg+Mausrad"), TR("Timeline zoomen")},
+            {TR("Shift+Mausrad"), TR("Timeline horizontal scrollen")},
+            {TR("Doppelklick Timeline"), TR("Aktion anlegen / bearbeiten")},
+            {TR("Ziehen in Timeline"), TR("Aktion zeitlich verschieben")},
         };
         if (ImGui::BeginTable("keys", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
             for (const Row& r : rows) {
@@ -914,7 +917,7 @@ void drawAbout(Editor& ed) {
             }
             ImGui::EndTable();
         }
-        if (ImGui::Button("Schliessen", ImVec2(120, 0))) {
+        if (ImGui::Button(TR("Schliessen"), ImVec2(120, 0))) {
             ed.dialogs.shortcuts = false;
             ImGui::CloseCurrentPopup();
         }
@@ -955,7 +958,7 @@ void openEditGroup(Editor& ed, const std::string& groupId) {
 
 void openNewElement(Editor& ed, const std::string& groupId) {
     if (!ed.project.group(groupId)) {
-        ed.setStatus("Bitte zuerst eine Gruppe waehlen.", true);
+        ed.setStatus(TR("Bitte zuerst eine Gruppe waehlen."), true);
         return;
     }
     ElementDialog& st = ed.dialogs.element;
@@ -1039,7 +1042,7 @@ void openNewBlock(Editor& ed, const std::vector<std::string>& connectionIds) {
     st.open = true;
     st.isNew = true;
     st.connectionIds = connectionIds;
-    st.draft.name = "Block";
+    st.draft.name = TR("Block");
 }
 
 void openMoveElement(Editor& ed, const std::string& elementId) {

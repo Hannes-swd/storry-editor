@@ -11,6 +11,7 @@
 #include "app/Platform.h"
 #include "core/StoryTime.h"
 #include "ui/Editor.h"
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 
 namespace se::ui {
@@ -27,7 +28,7 @@ void colorDot(const ImVec4& color, float radius) {
 }
 
 void helpMarker(const char* text) {
-    ImGui::TextDisabled("(?)");
+    ImGui::TextDisabled(TR("(?)"));
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
         ImGui::BeginTooltip();
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
@@ -55,9 +56,9 @@ std::string ellipsis(const std::string& text, size_t maxChars) {
 bool comboStrings(const char* label, const std::vector<std::string>& items, std::string& current,
                   bool allowCustomEmpty) {
     bool changed = false;
-    if (ImGui::BeginCombo(label, current.empty() ? "<keine>" : current.c_str())) {
+    if (ImGui::BeginCombo(label, current.empty() ? TR("<keine>") : current.c_str())) {
         if (allowCustomEmpty) {
-            if (ImGui::Selectable("<keine>", current.empty())) {
+            if (ImGui::Selectable(TR("<keine>"), current.empty())) {
                 current.clear();
                 changed = true;
             }
@@ -84,10 +85,10 @@ bool editableCombo(const char* label, std::vector<std::string>& items, std::stri
 
     // the popup must stay tall enough for the "new entry" row below the list
     ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(9999.0f, 460.0f));
-    if (ImGui::BeginCombo(label, current.empty() ? "<keine>" : current.c_str(),
+    if (ImGui::BeginCombo(label, current.empty() ? TR("<keine>") : current.c_str(),
                           ImGuiComboFlags_HeightLargest)) {
         if (allowEmpty) {
-            if (ImGui::Selectable("<keine>", current.empty())) {
+            if (ImGui::Selectable(TR("<keine>"), current.empty())) {
                 current.clear();
                 changed = true;
             }
@@ -103,9 +104,9 @@ bool editableCombo(const char* label, std::vector<std::string>& items, std::stri
 
         ImGui::Separator();
         std::string& draft = drafts[widgetId];
-        ImGui::TextUnformatted("Eigener Eintrag:");
+        ImGui::TextUnformatted(TR("Eigener Eintrag:"));
         ImGui::SetNextItemWidth(180.0f);
-        bool submitted = ImGui::InputTextWithHint("##newentry", "Name eingeben...", &draft,
+        bool submitted = ImGui::InputTextWithHint("##newentry", TR("Name eingeben..."), &draft,
                                                   ImGuiInputTextFlags_EnterReturnsTrue);
         ImGui::SameLine();
         if (ImGui::Button("+")) submitted = true;
@@ -139,9 +140,9 @@ bool tagPicker(Editor& ed, const char* label, std::string& commaSeparated) {
     }
 
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 130.0f);
-    if (ImGui::InputTextWithHint("##tags", "Tag1, Tag2, ...", &commaSeparated)) changed = true;
+    if (ImGui::InputTextWithHint("##tags", TR("Tag1, Tag2, ..."), &commaSeparated)) changed = true;
     ImGui::SameLine();
-    if (ImGui::Button("Vorhandene...")) ImGui::OpenPopup("tag_pick");
+    if (ImGui::Button(TR("Vorhandene..."))) ImGui::OpenPopup("tag_pick");
 
     if (ImGui::BeginPopup("tag_pick")) {
         std::vector<std::string> known;
@@ -151,7 +152,7 @@ bool tagPicker(Editor& ed, const char* label, std::string& commaSeparated) {
             }
         }
         std::sort(known.begin(), known.end());
-        if (known.empty()) textSecondary("Noch keine Tags im Projekt - einfach oben eintippen.");
+        if (known.empty()) textSecondary(TR("Noch keine Tags im Projekt - einfach oben eintippen."));
         for (const std::string& t : known) {
             bool on = std::find(selected.begin(), selected.end(), t) != selected.end();
             if (ImGui::Checkbox(t.c_str(), &on)) {
@@ -239,7 +240,7 @@ bool fieldValueEditor(Editor& ed, const FieldDef& field, std::string& value, con
                 ImGui::PopStyleColor();
             } else if (!value.empty()) {
                 ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().warningColor);
-                ImGui::TextUnformatted("nicht lesbar");
+                ImGui::TextUnformatted(TR("nicht lesbar"));
                 ImGui::PopStyleColor();
             } else {
                 textSecondary("leer");
@@ -285,7 +286,7 @@ bool fieldValueEditor(Editor& ed, const FieldDef& field, std::string& value, con
                 ImGui::PopID();
             }
             if (removeIndex >= 0) items.erase(items.begin() + removeIndex);
-            if (ImGui::SmallButton("+ Eintrag")) {
+            if (ImGui::SmallButton(TR("+ Eintrag"))) {
                 items.push_back("");
                 changed = true;
             }
@@ -308,8 +309,8 @@ bool fieldValueEditor(Editor& ed, const FieldDef& field, std::string& value, con
             ImGui::SetNextItemWidth(width - 90.0f);
             changed = ImGui::InputTextWithHint("##file", "Assets/Images/...", &value);
             ImGui::SameLine();
-            if (ImGui::Button("Waehlen")) {
-                std::string picked = platform::pickFile("Datei waehlen", nullptr, nullptr);
+            if (ImGui::Button(TR("Waehlen"))) {
+                std::string picked = platform::pickFile(TR("Datei waehlen"), nullptr, nullptr);
                 if (!picked.empty()) {
                     value = picked;
                     changed = true;
@@ -333,7 +334,7 @@ bool elementMultiSelect(Editor& ed, const char* label, std::vector<std::string>&
     ImGui::PushID(label);
     ImGui::TextUnformatted(label);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    ImGui::InputTextWithHint("##search", "Suchen...", &search);
+    ImGui::InputTextWithHint("##search", TR("Suchen..."), &search);
 
     ImGui::BeginChild("##list", ImVec2(0, height), ImGuiChildFlags_Borders);
     std::string lastGroup;
@@ -362,7 +363,7 @@ bool elementMultiSelect(Editor& ed, const char* label, std::vector<std::string>&
             if (i) names += ", ";
             names += ed.project.displayName(ids[i]);
         }
-        textSecondary(("Gewaehlt: " + names).c_str());
+        textSecondary((TR("Gewaehlt: ") + names).c_str());
     }
     ImGui::PopID();
     return changed;
@@ -370,9 +371,9 @@ bool elementMultiSelect(Editor& ed, const char* label, std::vector<std::string>&
 
 bool elementCombo(Editor& ed, const char* label, std::string& id, bool allowEmpty) {
     bool changed = false;
-    std::string preview = id.empty() ? "<keins>" : ed.project.elementPath(id);
+    std::string preview = id.empty() ? TR("<keins>") : ed.project.elementPath(id);
     if (ImGui::BeginCombo(label, preview.c_str())) {
-        if (allowEmpty && ImGui::Selectable("<keins>", id.empty())) {
+        if (allowEmpty && ImGui::Selectable(TR("<keins>"), id.empty())) {
             id.clear();
             changed = true;
         }
@@ -392,9 +393,9 @@ bool elementCombo(Editor& ed, const char* label, std::string& id, bool allowEmpt
 bool groupCombo(Editor& ed, const char* label, std::string& groupId, bool allowEmpty,
                 const std::string& excludeSubtree) {
     bool changed = false;
-    std::string preview = groupId.empty() ? "<oberste Ebene>" : ed.project.groupPath(groupId);
+    std::string preview = groupId.empty() ? TR("<oberste Ebene>") : ed.project.groupPath(groupId);
     if (ImGui::BeginCombo(label, preview.c_str())) {
-        if (allowEmpty && ImGui::Selectable("<oberste Ebene>", groupId.empty())) {
+        if (allowEmpty && ImGui::Selectable(TR("<oberste Ebene>"), groupId.empty())) {
             groupId.clear();
             changed = true;
         }

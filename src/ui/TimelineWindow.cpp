@@ -14,6 +14,7 @@
 #include "core/StoryTime.h"
 #include "ui/Dialogs.h"
 #include "ui/Editor.h"
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 #include "ui/UiCommon.h"
 #include "ui/Windows.h"
@@ -203,25 +204,25 @@ void drawFilterBar(Editor& ed, TimelineState& st) {
     const char* const* units = timeUnitLabels(&unitCount);
     int unitIndex = static_cast<int>(st.unit);
     ImGui::SetNextItemWidth(110.0f);
-    if (ImGui::Combo("Einheit", &unitIndex, units, unitCount)) st.unit = static_cast<TimeUnit>(unitIndex);
-    ui::tooltip("Basis-Zeiteinheit der Skala");
+    if (ImGui::Combo(TR("Einheit"), &unitIndex, units, unitCount)) st.unit = static_cast<TimeUnit>(unitIndex);
+    ui::tooltip(TR("Basis-Zeiteinheit der Skala"));
 
     ImGui::SameLine();
     ImGui::SetNextItemWidth(160.0f);
-    ImGui::SliderFloat("Zoom", &st.zoom, 0.05f, 20.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat(TR("Zoom"), &st.zoom, 0.05f, 20.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
 
     ImGui::SameLine();
-    ImGui::Checkbox("Komprimieren", &theme::settings().timelineCompressGaps);
+    ImGui::Checkbox(TR("Komprimieren"), &theme::settings().timelineCompressGaps);
     ui::tooltip(
-        "Lange Zeitraeume ohne Ereignisse werden zusammengeschoben, dichte Bereiche gedehnt.");
+        TR("Lange Zeitraeume ohne Ereignisse werden zusammengeschoben, dichte Bereiche gedehnt."));
 
     ImGui::SameLine();
     bool groupFilterActive = !st.groupFilter.empty();
     if (groupFilterActive) ImGui::PushStyleColor(ImGuiCol_Button, theme::accentFill());
-    if (ImGui::Button("Gruppen-Filter")) ImGui::OpenPopup("tl_groups");
+    if (ImGui::Button(TR("Gruppen-Filter"))) ImGui::OpenPopup("tl_groups");
     if (groupFilterActive) ImGui::PopStyleColor();
     if (ImGui::BeginPopup("tl_groups")) {
-        ImGui::TextUnformatted("Sichtbare Hauptgruppen (Mehrfachauswahl)");
+        ImGui::TextUnformatted(TR("Sichtbare Hauptgruppen (Mehrfachauswahl)"));
         ImGui::Separator();
         for (const Group& g : ed.project.groups) {
             if (!g.parentId.empty()) continue;
@@ -239,14 +240,14 @@ void drawFilterBar(Editor& ed, TimelineState& st) {
                     st.groupFilter.erase(g.id);
             }
         }
-        if (ImGui::Button("Alle")) st.groupFilter.clear();
+        if (ImGui::Button(TR("Alle"))) st.groupFilter.clear();
         ImGui::EndPopup();
     }
 
     // second row: the filters
     bool typeFilterActive = !st.typeFilter.empty();
     if (typeFilterActive) ImGui::PushStyleColor(ImGuiCol_Button, theme::accentFill());
-    if (ImGui::Button("Typ-Filter")) ImGui::OpenPopup("tl_types");
+    if (ImGui::Button(TR("Typ-Filter"))) ImGui::OpenPopup("tl_types");
     if (typeFilterActive) ImGui::PopStyleColor();
     if (ImGui::BeginPopup("tl_types")) {
         for (const std::string& t : ed.project.actionTypes) {
@@ -258,16 +259,16 @@ void drawFilterBar(Editor& ed, TimelineState& st) {
                     st.typeFilter.erase(t);
             }
         }
-        if (ImGui::Button("Alle")) st.typeFilter.clear();
+        if (ImGui::Button(TR("Alle"))) st.typeFilter.clear();
         ImGui::EndPopup();
     }
 
     ImGui::SameLine();
     ImGui::SetNextItemWidth(150.0f);
-    ImGui::InputTextWithHint("##search", "Element suchen...", &st.elementSearch);
+    ImGui::InputTextWithHint("##search", TR("Element suchen..."), &st.elementSearch);
 
     ImGui::SameLine();
-    ImGui::Checkbox("Zeitfenster", &st.useTimeFilter);
+    ImGui::Checkbox(TR("Zeitfenster"), &st.useTimeFilter);
     if (st.useTimeFilter) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(120.0f);
@@ -280,7 +281,7 @@ void drawFilterBar(Editor& ed, TimelineState& st) {
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("Filter zuruecksetzen")) {
+    if (ImGui::Button(TR("Filter zuruecksetzen"))) {
         st.groupFilter.clear();
         st.typeFilter.clear();
         st.elementSearch.clear();
@@ -292,12 +293,12 @@ void drawFilterBar(Editor& ed, TimelineState& st) {
 
 void drawTimelineWindow(Editor& ed, bool* open) {
     ImGui::SetNextWindowSize(ImVec2(1100, 460), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Timeline", open)) {
+    if (!ImGui::Begin(TWIN("Timeline", "timeline"), open)) {
         ImGui::End();
         return;
     }
     if (!ed.project.loaded) {
-        ui::textSecondary("Kein Projekt geoeffnet. Datei -> Neues Projekt.");
+        ui::textSecondary(TR("Kein Projekt geoeffnet. Datei -> Neues Projekt."));
         ImGui::End();
         return;
     }
@@ -557,10 +558,10 @@ void drawTimelineWindow(Editor& ed, bool* open) {
             if (!row.isGroup) ed.focusElementId = row.id;
         }
         if (ImGui::BeginPopupContextItem("##rowctx")) {
-            if (!row.isGroup && ImGui::MenuItem("Neue Aktion fuer dieses Element"))
+            if (!row.isGroup && ImGui::MenuItem(TR("Neue Aktion fuer dieses Element")))
                 dialogs::openNewAction(ed, times.empty() ? 0 : times.front(), row.id);
-            if (row.isGroup && ImGui::MenuItem("Neues Element")) dialogs::openNewElement(ed, row.id);
-            if (ImGui::MenuItem("Details anzeigen")) {
+            if (row.isGroup && ImGui::MenuItem(TR("Neues Element"))) dialogs::openNewElement(ed, row.id);
+            if (ImGui::MenuItem(TR("Details anzeigen"))) {
                 ed.select(row.isGroup ? SelKind::Group : SelKind::Element, row.id);
                 theme::settings().showDetails = true;
             }
@@ -610,10 +611,10 @@ void drawTimelineWindow(Editor& ed, bool* open) {
                 if (i) names += ", ";
                 names += ed.project.displayName(hoveredAction->elementIds[i]);
             }
-            ui::textSecondary(("Beteiligt: " + names).c_str());
+            ui::textSecondary((TR("Beteiligt: ") + names).c_str());
         }
         if (!hoveredAction->tags.empty())
-            ui::textSecondary(("Tags: " + joinList(hoveredAction->tags)).c_str());
+            ui::textSecondary((TR("Tags: ") + joinList(hoveredAction->tags)).c_str());
         ImGui::EndTooltip();
     }
 
@@ -635,7 +636,7 @@ void drawTimelineWindow(Editor& ed, bool* open) {
     if (st.dragActive && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         Action* a = ed.project.action(st.dragActionId);
         if (a) {
-            ed.pushUndo("Aktion verschoben");
+            ed.pushUndo(TR("Aktion verschoben"));
             a->time = st.dragTime;
             a->useRelative = false;
             a->relativeToId.clear();
@@ -649,7 +650,7 @@ void drawTimelineWindow(Editor& ed, bool* open) {
                 }
             }
             ed.markActions();
-            ed.setStatus("Aktion verschoben auf " + formatStoryTime(a->time));
+            ed.setStatus(TR("Aktion verschoben auf ") + formatStoryTime(a->time));
         }
         st.dragActive = false;
         st.dragActionId.clear();
@@ -670,26 +671,26 @@ void drawTimelineWindow(Editor& ed, bool* open) {
             if (a) {
                 ImGui::TextUnformatted(a->title.c_str());
                 ImGui::Separator();
-                if (ImGui::MenuItem("Bearbeiten")) dialogs::openEditAction(ed, st.ctxActionId);
-                if (ImGui::MenuItem("Duplizieren")) {
-                    ed.pushUndo("Aktion dupliziert");
+                if (ImGui::MenuItem(TR("Bearbeiten"))) dialogs::openEditAction(ed, st.ctxActionId);
+                if (ImGui::MenuItem(TR("Duplizieren"))) {
+                    ed.pushUndo(TR("Aktion dupliziert"));
                     Action copy = *a;
                     copy.id = newId("act");
-                    copy.title += " (Kopie)";
+                    copy.title += TR(" (Kopie)");
                     ed.project.actions.push_back(copy);
                     ed.markActions();
                 }
-                if (ImGui::MenuItem("Im Aktionen-Panel zeigen")) {
+                if (ImGui::MenuItem(TR("Im Aktionen-Panel zeigen"))) {
                     ed.focusActionId = st.ctxActionId;
                     theme::settings().showActions = true;
                 }
                 ImGui::Separator();
-                if (ImGui::MenuItem("Loeschen")) {
+                if (ImGui::MenuItem(TR("Loeschen"))) {
                     std::string id = st.ctxActionId;
                     std::string title = a->title;
-                    dialogs::confirm(ed, "Aktion loeschen", "Aktion \"" + title + "\" loeschen?", "",
+                    dialogs::confirm(ed, TR("Aktion loeschen"), TR("Aktion \"") + title + TR("\" loeschen?"), "",
                                      [&ed, id]() {
-                                         ed.pushUndo("Aktion geloescht");
+                                         ed.pushUndo(TR("Aktion geloescht"));
                                          ed.project.removeAction(id);
                                          ed.markActions();
                                      });
@@ -699,7 +700,7 @@ void drawTimelineWindow(Editor& ed, bool* open) {
             std::string elementId;
             if (st.dragRow >= 0 && st.dragRow < static_cast<int>(rows.size()) && !rows[st.dragRow].isGroup)
                 elementId = rows[st.dragRow].id;
-            if (ImGui::MenuItem("Neue Aktion hier")) dialogs::openNewAction(ed, st.dragTime, elementId);
+            if (ImGui::MenuItem(TR("Neue Aktion hier"))) dialogs::openNewAction(ed, st.dragTime, elementId);
             ImGui::TextDisabled("%s", formatStoryTimeLong(st.dragTime).c_str());
         }
         ImGui::EndPopup();
@@ -735,7 +736,7 @@ void drawTimelineWindow(Editor& ed, bool* open) {
 
     if (rows.empty()) {
         ImGui::SetCursorScreenPos(ImVec2(winPos.x + headerW + 20.0f, winPos.y + rulerH + 20.0f));
-        ui::textSecondary("Keine Spuren sichtbar - Gruppen anlegen oder Filter zuruecksetzen.");
+        ui::textSecondary(TR("Keine Spuren sichtbar - Gruppen anlegen oder Filter zuruecksetzen."));
     }
 
     ImGui::EndChild();

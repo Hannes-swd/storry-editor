@@ -53,7 +53,7 @@ compile_commands.json
 # %APPDATA%/StoryEditor, hier zur Sicherheit, falls jemand aus dem Projekt-
 # ordner heraus startet.
 imgui.ini
-imgui_layout.ini
+imgui_layout_v2.ini
 settings.json
 selftest.txt
 

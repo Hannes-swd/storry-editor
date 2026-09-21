@@ -12,6 +12,7 @@
 #include "core/VaultIO.h"
 #include "ui/Dialogs.h"
 #include "ui/Editor.h"
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 #include "ui/UiCommon.h"
 #include "ui/Windows.h"
@@ -72,18 +73,18 @@ void drawExpandedRow(Editor& ed, const Action& a) {
     ColorScheme& c = theme::colors();
     ImGui::Indent(12.0f);
     ImGui::PushStyleColor(ImGuiCol_Text, c.textSecondary);
-    ImGui::TextUnformatted(("Zeit: " + formatStoryTimeLong(ed.project.resolveActionTime(a))).c_str());
+    ImGui::TextUnformatted((TR("Zeit: ") + formatStoryTimeLong(ed.project.resolveActionTime(a))).c_str());
     ImGui::PopStyleColor();
     if (!a.description.empty()) ImGui::TextWrapped("%s", a.description.c_str());
 
     if (!a.elementIds.empty()) {
-        ImGui::TextUnformatted("Beteiligte:");
+        ImGui::TextUnformatted(TR("Beteiligte:"));
         for (const std::string& id : a.elementIds) ui::elementChip(ed, id);
         ImGui::NewLine();
     }
-    if (!a.tags.empty()) ui::textSecondary(("Tags: " + joinList(a.tags)).c_str());
+    if (!a.tags.empty()) ui::textSecondary((TR("Tags: ") + joinList(a.tags)).c_str());
     if (!a.attachments.empty()) {
-        ui::textSecondary(("Anhaenge: " + std::to_string(a.attachments.size())).c_str());
+        ui::textSecondary((TR("Anhaenge: ") + std::to_string(a.attachments.size())).c_str());
         for (const std::string& att : a.attachments) {
             ImGui::PushID(att.c_str());
             if (ImGui::SmallButton(att.c_str()))
@@ -92,7 +93,7 @@ void drawExpandedRow(Editor& ed, const Action& a) {
         }
     }
     if (!a.mutations.empty()) {
-        ImGui::TextUnformatted("Attribut-Aenderungen:");
+        ImGui::TextUnformatted(TR("Attribut-Aenderungen:"));
         for (const Mutation& m : a.mutations) {
             ImGui::BulletText("%s.%s: %s -> %s", ed.project.displayName(m.elementId).c_str(),
                               m.field.c_str(), m.oldValue.c_str(), m.newValue.c_str());
@@ -100,18 +101,18 @@ void drawExpandedRow(Editor& ed, const Action& a) {
     }
 
     ImGui::PushID(a.id.c_str());
-    if (ImGui::SmallButton("Bearbeiten")) dialogs::openEditAction(ed, a.id);
+    if (ImGui::SmallButton(TR("Bearbeiten"))) dialogs::openEditAction(ed, a.id);
     ImGui::SameLine();
-    if (ImGui::SmallButton("Duplizieren")) {
-        ed.pushUndo("Aktion dupliziert");
+    if (ImGui::SmallButton(TR("Duplizieren"))) {
+        ed.pushUndo(TR("Aktion dupliziert"));
         Action copy = a;
         copy.id = newId("act");
-        copy.title += " (Kopie)";
+        copy.title += TR(" (Kopie)");
         ed.project.actions.push_back(copy);
         ed.markActions();
     }
     ImGui::SameLine();
-    if (ImGui::SmallButton("Zur Timeline")) {
+    if (ImGui::SmallButton(TR("Zur Timeline"))) {
         ed.focusActionId = a.id;
         ed.focusTimeline = true;
         ed.select(SelKind::Action, a.id);
@@ -119,12 +120,12 @@ void drawExpandedRow(Editor& ed, const Action& a) {
     }
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Button, theme::withAlpha(c.errorColor, 0.7f));
-    if (ImGui::SmallButton("Loeschen")) {
+    if (ImGui::SmallButton(TR("Loeschen"))) {
         std::string id = a.id;
         std::string title = a.title;
-        dialogs::confirm(ed, "Aktion loeschen", "Aktion \"" + title + "\" loeschen?", "",
+        dialogs::confirm(ed, TR("Aktion loeschen"), TR("Aktion \"") + title + TR("\" loeschen?"), "",
                          [&ed, id]() {
-                             ed.pushUndo("Aktion geloescht");
+                             ed.pushUndo(TR("Aktion geloescht"));
                              ed.project.removeAction(id);
                              ed.markActions();
                          });
@@ -139,12 +140,12 @@ void drawExpandedRow(Editor& ed, const Action& a) {
 
 void drawActionsWindow(Editor& ed, bool* open) {
     ImGui::SetNextWindowSize(ImVec2(820, 420), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Aktionen", open)) {
+    if (!ImGui::Begin(TWIN("Aktionen", "actions"), open)) {
         ImGui::End();
         return;
     }
     if (!ed.project.loaded) {
-        ui::textSecondary("Kein Projekt geoeffnet.");
+        ui::textSecondary(TR("Kein Projekt geoeffnet."));
         ImGui::End();
         return;
     }
@@ -152,18 +153,18 @@ void drawActionsWindow(Editor& ed, bool* open) {
     ActionsState& st = state();
 
     // ------------------------------------------------------------ filter bar
-    if (ImGui::Button("+ Neue Aktion")) dialogs::openNewAction(ed, 0, "");
+    if (ImGui::Button(TR("+ Neue Aktion"))) dialogs::openNewAction(ed, 0, "");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(180.0f);
-    ImGui::InputTextWithHint("##search", "Volltextsuche...", &st.search);
+    ImGui::InputTextWithHint("##search", TR("Volltextsuche..."), &st.search);
     ImGui::SameLine();
     bool elementFilterActive = !st.elementFilter.empty();
     if (elementFilterActive) ImGui::PushStyleColor(ImGuiCol_Button, theme::accentFill());
-    if (ImGui::Button("Beteiligte filtern")) ImGui::OpenPopup("act_elements");
+    if (ImGui::Button(TR("Beteiligte filtern"))) ImGui::OpenPopup("act_elements");
     if (elementFilterActive) ImGui::PopStyleColor();
     if (ImGui::BeginPopup("act_elements")) {
-        ui::elementMultiSelect(ed, "Elemente", st.elementFilter, st.elementSearch, 220.0f);
-        if (ImGui::Button("Leeren")) st.elementFilter.clear();
+        ui::elementMultiSelect(ed, TR("Elemente"), st.elementFilter, st.elementSearch, 220.0f);
+        if (ImGui::Button(TR("Leeren"))) st.elementFilter.clear();
         ImGui::EndPopup();
     }
     ImGui::SameLine();
@@ -174,7 +175,7 @@ void drawActionsWindow(Editor& ed, bool* open) {
     std::vector<std::string> tags = allTags(ed.project);
     ui::comboStrings("##tag", tags, st.tagFilter, true);
     ImGui::SameLine();
-    ImGui::Checkbox("Zeitraum", &st.useTimeFilter);
+    ImGui::Checkbox(TR("Zeitraum"), &st.useTimeFilter);
     long long fromT = 0, toT = 0;
     if (st.useTimeFilter) {
         ImGui::SameLine();
@@ -187,7 +188,7 @@ void drawActionsWindow(Editor& ed, bool* open) {
         if (!parseStoryTime(st.toText, &toT)) toT = fromT + 30 * kMinutesPerDay;
     }
     ImGui::SameLine();
-    if (ImGui::Button("Filter zuruecksetzen")) {
+    if (ImGui::Button(TR("Filter zuruecksetzen"))) {
         st = ActionsState{};
     }
 
@@ -219,7 +220,7 @@ void drawActionsWindow(Editor& ed, bool* open) {
         return st.sortAscending ? less : !less;
     });
 
-    ImGui::Text("%d von %d Aktionen", static_cast<int>(rows.size()),
+    ImGui::Text(TR("%d von %d Aktionen"), static_cast<int>(rows.size()),
                 static_cast<int>(ed.project.actions.size()));
 
     ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
@@ -228,11 +229,11 @@ void drawActionsWindow(Editor& ed, bool* open) {
     if (ImGui::BeginTable("actions", 6, flags)) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 40.0f);
-        ImGui::TableSetupColumn("Titel", ImGuiTableColumnFlags_WidthStretch, 3.0f);
-        ImGui::TableSetupColumn("Zeit", ImGuiTableColumnFlags_WidthFixed, 130.0f);
-        ImGui::TableSetupColumn("Typ", ImGuiTableColumnFlags_WidthFixed, 110.0f);
-        ImGui::TableSetupColumn("Beteiligte", ImGuiTableColumnFlags_WidthStretch, 2.5f);
-        ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort,
+        ImGui::TableSetupColumn(TR("Titel"), ImGuiTableColumnFlags_WidthStretch, 3.0f);
+        ImGui::TableSetupColumn(TR("Zeit"), ImGuiTableColumnFlags_WidthFixed, 130.0f);
+        ImGui::TableSetupColumn(TR("Typ"), ImGuiTableColumnFlags_WidthFixed, 110.0f);
+        ImGui::TableSetupColumn(TR("Beteiligte"), ImGuiTableColumnFlags_WidthStretch, 2.5f);
+        ImGui::TableSetupColumn(TR("Details"), ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort,
                                 70.0f);
         ImGui::TableHeadersRow();
 
@@ -278,7 +279,7 @@ void drawActionsWindow(Editor& ed, bool* open) {
 
             ImGui::TableSetColumnIndex(5);
             bool isExpanded = st.expanded.count(a->id) > 0;
-            if (ImGui::SmallButton(isExpanded ? "zu" : "auf")) {
+            if (ImGui::SmallButton(isExpanded ? TR("zu") : TR("auf"))) {
                 if (isExpanded)
                     st.expanded.erase(a->id);
                 else

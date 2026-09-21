@@ -1,3 +1,4 @@
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 
 #include <algorithm>
@@ -45,7 +46,7 @@ ColorScheme& colors() { return settings().colors; }
 void resetToDefault() { applyPreset(ThemePreset::Light); }
 
 const char* presetName(ThemePreset preset) {
-    return preset == ThemePreset::Light ? "Hell" : "Dunkel";
+    return preset == ThemePreset::Light ? TR("Hell") : TR("Dunkel");
 }
 
 void applyPreset(ThemePreset preset) {
@@ -211,6 +212,7 @@ void applyImGuiStyle() {
 bool save() {
     AppSettings& s = settings();
     json j;
+    j["language"] = lang::code(s.language);
     j["preset"] = presetName(s.preset);
     j["font_size"] = s.fontSize;
     j["timeline"] = {{"track_height", s.timelineTrackHeight},
@@ -269,9 +271,11 @@ bool load() {
     // Dateien aus einer Version vor den Designs ("preset" fehlt) bringen noch die
     // alte dunkelblaue Palette mit - die wird verworfen, damit das neue helle
     // Standarddesign greift.
+    s.language = lang::fromCode(j.value("language", std::string(lang::code(s.language))));
+    lang::set(s.language);
     const bool hasPreset = j.contains("preset");
-    const std::string preset = j.value("preset", std::string("Hell"));
-    applyPreset(preset == "Dunkel" ? ThemePreset::Dark : ThemePreset::Light);
+    const std::string preset = j.value("preset", std::string(TR("Hell")));
+    applyPreset(preset == TR("Dunkel") ? ThemePreset::Dark : ThemePreset::Light);
     s.fontSize = j.value("font_size", s.fontSize);
     if (j.contains("timeline")) {
         const json& t = j["timeline"];

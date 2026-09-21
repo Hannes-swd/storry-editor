@@ -1,5 +1,7 @@
 # Story Editor
 
+*[English version: README.en.md](README.en.md)*
+
 Schreib-Management-Software für komplexe Geschichten – C++17 + Dear ImGui (Win32/DirectX 11),
 Speicherung in einem Obsidian-Vault (Markdown + JSON).
 
@@ -35,7 +37,17 @@ Kommandozeile:
 | **Story Visualizer** | 3.3 | Read-only-Chronik: Tagesüberschriften, „… vergehen“-Lücken, Attribut-Änderungen, Filter nach Element/Strang/Wichtigkeit |
 | **Connections** | 3.4 | Netzwerkgraph, Knoten ziehen, Kanten mit Typ-Label und Pfeil, Blöcke (gruppierte Verbindungen), Fokus auf ein Element mit Grad 1–3, Typ-Filter |
 | **Dateimanager** | 3.6 | Strukturierte Ansicht (Gruppen → Dateien) und rohe Vault-Ansicht, Upload (Dialog oder Drag & Drop aus dem Explorer), Umbenennen/Verschieben/Löschen, Bildvorschau, Datei mit Element verknüpfen |
-| **Einstellungen** | 2.3 / 7.1 | Design (Hell/Dunkel), alle Farben des Farbschemas, Gruppenfarben, Timeline-Parameter, Verwaltung der eigenen Listen; gespeichert in `%APPDATA%/StoryEditor/settings.json` |
+| **Einstellungen** | 2.3 / 7.1 | Sprache, Design (Hell/Dunkel), alle Farben des Farbschemas, Gruppenfarben, Timeline-Parameter, Verwaltung der eigenen Listen; gespeichert in `%APPDATA%/StoryEditor/settings.json` |
+
+## Sprache
+
+Die Oberfläche gibt es auf **Deutsch und Englisch**. Umschalten unter **Ansicht → Sprache /
+Language** oder in **Einstellungen → Farben**. Beim allerersten Start entscheidet die
+Windows-Anzeigesprache, danach steht die Wahl in `settings.json`.
+
+Die Sprache gilt auch für erzeugte Texte: Zeitangaben (`Tag 5, 14:00` / `Day 5, 14:00`), Dauern
+und die Abschnittsüberschriften in den Element-`.md`-Dateien. Beim Lesen werden immer beide
+Schreibweisen akzeptiert – ein Sprachwechsel macht also keinen bestehenden Vault kaputt.
 
 ## Design
 
@@ -79,7 +91,7 @@ Zeiteinheiten – die sind im Code verankert.
 
 Fensterlayout: Blender-artiges Docking (ImGui-Dockspace, Multi-Viewport – Fenster können auch
 aus dem Hauptfenster gezogen werden). Positionen/Größen landen in
-`%APPDATA%/StoryEditor/imgui_layout.ini`, sichtbare Fenster in `settings.json`.
+`%APPDATA%/StoryEditor/imgui_layout_v2.ini`, sichtbare Fenster in `settings.json`.
 
 ## Tastenkürzel
 
@@ -154,11 +166,12 @@ den wiederhergestellten Stand direkt in den Vault.
 ```
 src/core     Datenmodell, Zeitlogik, Vault-I/O (Markdown+JSON), File-Watcher, Selbsttest
 src/app      Win32/DX11-Host, Plattform-Helfer (Dialoge, Unicode-Pfade), Texture-Cache
-src/ui       Editor-Zustand (Undo, Auswahl, Speicher-Queue), Farbschema, Dialoge, Fenster
+src/ui       Editor-Zustand (Undo, Auswahl, Speicher-Queue), Farbschema, Sprache, Dialoge, Fenster
 ```
 
 Farben kommen ausschließlich aus `ColorScheme` (`src/ui/Theme.h`) bzw. aus den Gruppenfarben –
-keine fest verdrahteten RGB-Werte in den Fenstern.
+keine fest verdrahteten RGB-Werte in den Fenstern. UI-Texte laufen über `TR("...")` mit dem
+deutschen Text als Schlüssel; die Tabelle steht in `src/ui/Lang.cpp`.
 
 ## Bekannte Grenzen
 

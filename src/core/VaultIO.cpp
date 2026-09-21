@@ -13,8 +13,19 @@ using nlohmann::json;
 namespace se::vault {
 namespace {
 
-const char* kManagedNote =
-    "> Diese Datei wird vom Story Editor verwaltet. Bitte ausschliesslich ueber die UI bearbeiten.";
+const char* managedNote() {
+    return englishTexts()
+               ? "> This file is managed by Story Editor. Please edit it through the UI only."
+               : "> Diese Datei wird vom Story Editor verwaltet. Bitte ausschliesslich ueber die UI "
+                 "bearbeiten.";
+}
+
+// Abschnittsnamen folgen der UI-Sprache; gelesen werden immer beide.
+// Section names follow the UI language; both are always accepted when reading.
+const char* sectionFields() { return englishTexts() ? "Fields" : "Felder"; }
+const char* sectionText() { return "Text"; }
+const char* sectionRelations() { return englishTexts() ? "Relations" : "Beziehungen"; }
+const char* sectionActions() { return englishTexts() ? "Linked actions" : "Verknuepfte Aktionen"; }
 
 std::string escapeInline(const std::string& s) {
     std::string out;
@@ -256,9 +267,9 @@ std::string elementMarkdown(const Project& p, const Element& el) {
     std::ostringstream os;
     os << "# " << el.name << "\n\n";
     os << "<!-- story-editor: id=" << el.id << "; group=" << p.groupPath(el.groupId) << " -->\n";
-    os << kManagedNote << "\n\n";
+    os << managedNote() << "\n\n";
 
-    os << "## Felder\n";
+    os << "## " << sectionFields() << "\n";
     std::vector<std::string> order = el.fieldOrder;
     for (const auto& kv : el.values) {
         if (std::find(order.begin(), order.end(), kv.first) == order.end()) order.push_back(kv.first);
@@ -268,11 +279,11 @@ std::string elementMarkdown(const Project& p, const Element& el) {
         if (it == el.values.end()) continue;
         os << "- " << key << ": " << escapeInline(it->second) << "\n";
     }
-    os << "\n## Text\n" << el.body << "\n";
+    os << "\n## " << sectionText() << "\n" << el.body << "\n";
 
     std::vector<const Connection*> conns = p.connectionsForElement(el.id);
     if (!conns.empty()) {
-        os << "\n## Beziehungen\n";
+        os << "\n## " << sectionRelations() << "\n";
         for (const Connection* c : conns) {
             const std::string other = c->sourceId == el.id ? c->targetId : c->sourceId;
             const char* dir = c->sourceId == el.id ? "->" : "<-";
@@ -282,7 +293,7 @@ std::string elementMarkdown(const Project& p, const Element& el) {
 
     std::vector<const Action*> acts = p.actionsForElement(el.id);
     if (!acts.empty()) {
-        os << "\n## Verknuepfte Aktionen\n";
+        os << "\n## " << sectionActions() << "\n";
         for (const Action* a : acts) {
             os << "- " << formatStoryTime(p.resolveActionTime(*a)) << " - " << a->title << "\n";
         }
@@ -331,7 +342,7 @@ bool parseElementMarkdown(const std::string& text, std::string* outName,
             section = trim(line.substr(3));
             continue;
         }
-        if (section == "Felder") {
+        if (section == "Felder" || section == "Fields") {
             if (line.rfind("- ", 0) != 0) continue;
             std::string rest = line.substr(2);
             size_t colon = rest.find(':');

@@ -8,6 +8,7 @@
 
 #include "core/StoryTime.h"
 #include "ui/Editor.h"
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 #include "ui/UiCommon.h"
 #include "ui/Windows.h"
@@ -43,12 +44,12 @@ std::string firstSentences(const std::string& text, int count) {
 
 void drawStoryVisualizerWindow(Editor& ed, bool* open) {
     ImGui::SetNextWindowSize(ImVec2(620, 560), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Story Visualizer", open)) {
+    if (!ImGui::Begin(TWIN("Story Visualizer", "story"), open)) {
         ImGui::End();
         return;
     }
     if (!ed.project.loaded) {
-        ui::textSecondary("Kein Projekt geoeffnet.");
+        ui::textSecondary(TR("Kein Projekt geoeffnet."));
         ImGui::End();
         return;
     }
@@ -57,18 +58,18 @@ void drawStoryVisualizerWindow(Editor& ed, bool* open) {
     ColorScheme& c = theme::colors();
 
     ImGui::SetNextItemWidth(220.0f);
-    ui::elementCombo(ed, "Fokus", st.focusElementId, true);
+    ui::elementCombo(ed, TR("Fokus"), st.focusElementId, true);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(160.0f);
-    ui::comboStrings("Strang", ed.project.storylines, st.storyline, true);
+    ui::comboStrings(TR("Strang"), ed.project.storylines, st.storyline, true);
     ImGui::SameLine();
-    ImGui::Checkbox("nur Wichtiges", &st.onlyMajor);
+    ImGui::Checkbox(TR("nur Wichtiges"), &st.onlyMajor);
     ImGui::SameLine();
-    ImGui::Checkbox("voller Text", &st.fullText);
+    ImGui::Checkbox(TR("voller Text"), &st.fullText);
     ImGui::SameLine();
-    ImGui::Checkbox("Werteaenderungen", &st.showMutations);
+    ImGui::Checkbox(TR("Werteaenderungen"), &st.showMutations);
     ImGui::Separator();
-    ui::textSecondary("Nur-Lese-Ansicht: hier wird die Geschichte erzaehlt, nicht bearbeitet.");
+    ui::textSecondary(TR("Nur-Lese-Ansicht: hier wird die Geschichte erzaehlt, nicht bearbeitet."));
 
     ImGui::BeginChild("story", ImVec2(0, 0), ImGuiChildFlags_Borders);
 
@@ -105,8 +106,8 @@ void drawStoryVisualizerWindow(Editor& ed, bool* open) {
             if (gap >= kMinutesPerDay) {
                 ImGui::Spacing();
                 ImGui::PushStyleColor(ImGuiCol_Text, c.textSecondary);
-                std::string label = "--- " + formatDuration(gap) + " vergehen";
-                if (skippedFrom >= 0) label += " (nicht gezeigte Ereignisse dazwischen)";
+                std::string label = "--- " + formatDuration(gap) + TR(" vergehen");
+                if (skippedFrom >= 0) label += TR(" (nicht gezeigte Ereignisse dazwischen)");
                 label += " ---";
                 ImGui::TextUnformatted(label.c_str());
                 ImGui::PopStyleColor();
@@ -170,7 +171,7 @@ void drawStoryVisualizerWindow(Editor& ed, bool* open) {
         lastShownTime = t;
     }
 
-    if (shown.empty()) ui::textSecondary("Keine Ereignisse fuer diese Auswahl.");
+    if (shown.empty()) ui::textSecondary(TR("Keine Ereignisse fuer diese Auswahl."));
     ImGui::EndChild();
     ImGui::End();
 }

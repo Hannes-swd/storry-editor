@@ -12,6 +12,7 @@
 
 #include "ui/Dialogs.h"
 #include "ui/Editor.h"
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 #include "ui/UiCommon.h"
 #include "ui/Windows.h"
@@ -102,12 +103,12 @@ float distanceToSegment(const ImVec2& p, const ImVec2& a, const ImVec2& b) {
 
 void drawConnectionsWindow(Editor& ed, bool* open) {
     ImGui::SetNextWindowSize(ImVec2(760, 560), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Connections", open)) {
+    if (!ImGui::Begin(TWIN("Connections", "connections"), open)) {
         ImGui::End();
         return;
     }
     if (!ed.project.loaded) {
-        ui::textSecondary("Kein Projekt geoeffnet.");
+        ui::textSecondary(TR("Kein Projekt geoeffnet."));
         ImGui::End();
         return;
     }
@@ -118,14 +119,14 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
     // ------------------------------------------------------------- toolbar
     bool canConnect = st.selected.size() == 2;
     if (!canConnect) ImGui::BeginDisabled();
-    if (ImGui::Button("Verbindung erstellen"))
+    if (ImGui::Button(TR("Verbindung erstellen")))
         dialogs::openNewConnection(ed, st.selected[0], st.selected[1]);
     if (!canConnect) ImGui::EndDisabled();
 
     ImGui::SameLine();
     bool canBlock = st.selected.size() >= 2;
     if (!canBlock) ImGui::BeginDisabled();
-    if (ImGui::Button("Block erstellen")) {
+    if (ImGui::Button(TR("Block erstellen"))) {
         std::vector<std::string> connIds;
         for (const Connection& conn : ed.project.connections) {
             bool a = std::find(st.selected.begin(), st.selected.end(), conn.sourceId) != st.selected.end();
@@ -135,23 +136,23 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
         dialogs::openNewBlock(ed, connIds);
     }
     if (!canBlock) ImGui::EndDisabled();
-    ui::tooltip("Fasst alle Verbindungen zwischen den markierten Knoten zu einem Block zusammen.");
+    ui::tooltip(TR("Fasst alle Verbindungen zwischen den markierten Knoten zu einem Block zusammen."));
 
     ImGui::SameLine();
-    if (ImGui::Button("Auswahl leeren")) {
+    if (ImGui::Button(TR("Auswahl leeren"))) {
         st.selected.clear();
         st.selectedConnection.clear();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Auto-Layout")) {
-        ed.pushUndo("Auto-Layout");
+    if (ImGui::Button(TR("Auto-Layout"))) {
+        ed.pushUndo(TR("Auto-Layout"));
         ed.project.nodePositions.clear();
         ed.markMetadata();
     }
     ImGui::SameLine();
     bool filterActive = !st.typeFilter.empty();
     if (filterActive) ImGui::PushStyleColor(ImGuiCol_Button, theme::accentFill());
-    if (ImGui::Button("Typ-Filter")) ImGui::OpenPopup("conn_types");
+    if (ImGui::Button(TR("Typ-Filter"))) ImGui::OpenPopup("conn_types");
     if (filterActive) ImGui::PopStyleColor();
     if (ImGui::BeginPopup("conn_types")) {
         for (const std::string& t : ed.project.connectionTypes) {
@@ -163,21 +164,21 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
                     st.typeFilter.erase(t);
             }
         }
-        if (ImGui::Button("Alle")) st.typeFilter.clear();
+        if (ImGui::Button(TR("Alle"))) st.typeFilter.clear();
         ImGui::EndPopup();
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(180.0f);
-    ui::elementCombo(ed, "Fokus", st.focusId, true);
+    ui::elementCombo(ed, TR("Fokus"), st.focusId, true);
     if (!st.focusId.empty()) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(90.0f);
-        ImGui::SliderInt("Grad", &st.focusDegree, 1, 3);
+        ImGui::SliderInt(TR("Grad"), &st.focusDegree, 1, 3);
     }
 
     if (!ed.project.blocks.empty()) {
         ImGui::SameLine();
-        if (ImGui::Button("Bloecke")) ImGui::OpenPopup("conn_blocks");
+        if (ImGui::Button(TR("Bloecke"))) ImGui::OpenPopup("conn_blocks");
         if (ImGui::BeginPopup("conn_blocks")) {
             for (Block& b : ed.project.blocks) {
                 ImGui::PushID(b.id.c_str());
@@ -185,8 +186,8 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
                 ImGui::SameLine();
                 ImGui::TextUnformatted(b.name.c_str());
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Loeschen")) {
-                    ed.pushUndo("Block geloescht");
+                if (ImGui::SmallButton(TR("Loeschen"))) {
+                    ed.pushUndo(TR("Block geloescht"));
                     ed.project.removeBlock(b.id);
                     ed.markConnections();
                     ImGui::PopID();
@@ -385,13 +386,13 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
             const Connection* conn = ed.project.connection(st.selectedConnection);
             if (conn) {
                 ImGui::TextDisabled("%s", conn->type.c_str());
-                if (ImGui::MenuItem("Verbindung bearbeiten"))
+                if (ImGui::MenuItem(TR("Verbindung bearbeiten")))
                     dialogs::openEditConnection(ed, st.selectedConnection);
-                if (ImGui::MenuItem("Verbindung loeschen")) {
+                if (ImGui::MenuItem(TR("Verbindung loeschen"))) {
                     std::string id = st.selectedConnection;
-                    dialogs::confirm(ed, "Verbindung loeschen", "Diese Verbindung loeschen?", "",
+                    dialogs::confirm(ed, TR("Verbindung loeschen"), TR("Diese Verbindung loeschen?"), "",
                                      [&ed, id]() {
-                                         ed.pushUndo("Verbindung geloescht");
+                                         ed.pushUndo(TR("Verbindung geloescht"));
                                          ed.project.removeConnection(id);
                                          ed.markConnections();
                                      });
@@ -400,28 +401,28 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
             }
         }
         if (st.selected.size() == 2) {
-            if (ImGui::MenuItem("Die zwei markierten verbinden"))
+            if (ImGui::MenuItem(TR("Die zwei markierten verbinden")))
                 dialogs::openNewConnection(ed, st.selected[0], st.selected[1]);
         }
         if (st.selected.size() == 1) {
-            if (ImGui::MenuItem("Verbindung von hier..."))
+            if (ImGui::MenuItem(TR("Verbindung von hier...")))
                 dialogs::openNewConnection(ed, st.selected[0], "");
-            if (ImGui::MenuItem("Details anzeigen")) {
+            if (ImGui::MenuItem(TR("Details anzeigen"))) {
                 ed.select(SelKind::Element, st.selected[0]);
                 theme::settings().showDetails = true;
             }
         }
-        if (ImGui::MenuItem("Auswahl leeren")) st.selected.clear();
+        if (ImGui::MenuItem(TR("Auswahl leeren"))) st.selected.clear();
         ImGui::EndPopup();
     }
 
     if (nodes.empty())
         dl->AddText(ImVec2(canvasPos.x + 20.0f, canvasPos.y + 20.0f), theme::u32(c.textSecondary),
-                    "Keine Elemente vorhanden.");
+                    TR("Keine Elemente vorhanden."));
     else
         dl->AddText(ImVec2(canvasPos.x + 8.0f, canvasPos.y + canvasSize.y - 20.0f),
                     theme::u32(c.textSecondary),
-                    "Linksklick = waehlen (Strg = mehrere), ziehen = verschieben, Rad = Zoom");
+                    TR("Linksklick = waehlen (Strg = mehrere), ziehen = verschieben, Rad = Zoom"));
 
     ImGui::EndChild();
     ImGui::End();

@@ -10,6 +10,7 @@
 #include "app/Platform.h"
 #include "core/StoryTime.h"
 #include "core/VaultIO.h"
+#include "ui/Lang.h"
 #include "ui/Theme.h"
 #include "ui/UiCommon.h"
 #include "ui/Windows.h"
@@ -25,7 +26,7 @@ void Editor::init() {
         std::string err;
         if (vault::load(s.lastVault, project, &err)) {
             watcher.reset(project);
-            setStatus("Projekt geladen: " + project.name);
+            setStatus(TR("Projekt geladen: ") + project.name);
         } else {
             s.lastVault.clear();
         }
@@ -79,7 +80,7 @@ void Editor::undo() {
     dirtyAll_ = true;
     flushSaves();
     watcher.reset(project);
-    setStatus("Rueckgaengig: " + entry.label);
+    setStatus(TR("Rueckgaengig: ") + entry.label);
 }
 
 void Editor::redo() {
@@ -91,7 +92,7 @@ void Editor::redo() {
     dirtyAll_ = true;
     flushSaves();
     watcher.reset(project);
-    setStatus("Wiederholt: " + entry.label);
+    setStatus(TR("Wiederholt: ") + entry.label);
 }
 
 void Editor::markElement(const std::string& id) {
@@ -154,7 +155,7 @@ void Editor::setStatus(const std::string& text, bool error) {
 bool Editor::createProject(const std::string& folder, const std::string& name) {
     std::string err;
     if (!vault::createVault(folder, name, project, &err)) {
-        setStatus(err.empty() ? "Projekt konnte nicht erstellt werden." : err, true);
+        setStatus(err.empty() ? TR("Projekt konnte nicht erstellt werden.") : err, true);
         return false;
     }
     undoStack_.clear();
@@ -163,7 +164,7 @@ bool Editor::createProject(const std::string& folder, const std::string& name) {
     theme::settings().lastVault = folder;
     theme::settings().lastProjectName = name;
     theme::save();
-    setStatus("Projekt erstellt: " + name);
+    setStatus(TR("Projekt erstellt: ") + name);
     return true;
 }
 
@@ -171,7 +172,7 @@ bool Editor::openProject(const std::string& folder) {
     std::string err;
     Project loadedProject;
     if (!vault::load(folder, loadedProject, &err)) {
-        setStatus(err.empty() ? "Projekt konnte nicht geladen werden." : err, true);
+        setStatus(err.empty() ? TR("Projekt konnte nicht geladen werden.") : err, true);
         return false;
     }
     project = loadedProject;
@@ -182,7 +183,7 @@ bool Editor::openProject(const std::string& folder) {
     theme::settings().lastVault = folder;
     theme::settings().lastProjectName = project.name;
     theme::save();
-    setStatus("Projekt geoeffnet: " + project.name);
+    setStatus(TR("Projekt geoeffnet: ") + project.name);
     return true;
 }
 
@@ -194,7 +195,7 @@ void Editor::closeProject() {
     selection = Selection{};
     theme::settings().lastVault.clear();
     theme::save();
-    setStatus("Projekt geschlossen.");
+    setStatus(TR("Projekt geschlossen."));
 }
 
 void Editor::saveEverything() {
@@ -202,7 +203,7 @@ void Editor::saveEverything() {
     std::string err;
     if (vault::saveAll(project, &err)) {
         for (const Element& el : project.elements) watcher.touch(project, el);
-        setStatus("Gespeichert nach " + project.vaultPath);
+        setStatus(TR("Gespeichert nach ") + project.vaultPath);
     } else {
         setStatus(err, true);
     }
@@ -248,33 +249,33 @@ void Editor::drawMainMenuBar() {
     AppSettings& s = theme::settings();
     if (!ImGui::BeginMainMenuBar()) return;
 
-    if (ImGui::BeginMenu("Datei")) {
-        if (ImGui::MenuItem("Neues Projekt...", "Strg+Shift+N")) dialogs::openNewProject(*this);
-        if (ImGui::MenuItem("Projekt oeffnen...", "Strg+O")) {
-            std::string folder = platform::pickFolder("Obsidian-Vault waehlen");
+    if (ImGui::BeginMenu(TR("Datei"))) {
+        if (ImGui::MenuItem(TR("Neues Projekt..."), TR("Strg+Shift+N"))) dialogs::openNewProject(*this);
+        if (ImGui::MenuItem(TR("Projekt oeffnen..."), TR("Strg+O"))) {
+            std::string folder = platform::pickFolder(TR("Obsidian-Vault waehlen"));
             if (!folder.empty()) openProject(folder);
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Speichern", "Strg+S", false, project.loaded)) saveEverything();
-        if (ImGui::MenuItem("Vault im Explorer oeffnen", nullptr, false, project.loaded))
+        if (ImGui::MenuItem(TR("Speichern"), TR("Strg+S"), false, project.loaded)) saveEverything();
+        if (ImGui::MenuItem(TR("Vault im Explorer oeffnen"), nullptr, false, project.loaded))
             platform::openInShell(project.vaultPath);
-        if (ImGui::MenuItem("Projekt schliessen", nullptr, false, project.loaded)) closeProject();
+        if (ImGui::MenuItem(TR("Projekt schliessen"), nullptr, false, project.loaded)) closeProject();
         ImGui::Separator();
-        if (ImGui::MenuItem("Beenden", "Alt+F4")) quitRequested = true;
+        if (ImGui::MenuItem(TR("Beenden"), "Alt+F4")) quitRequested = true;
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu("Bearbeiten")) {
-        if (ImGui::MenuItem(canUndo() ? ("Rueckgaengig: " + undoLabel()).c_str() : "Rueckgaengig",
-                            "Strg+Z", false, canUndo()))
+    if (ImGui::BeginMenu(TR("Bearbeiten"))) {
+        if (ImGui::MenuItem(canUndo() ? (TR("Rueckgaengig: ") + undoLabel()).c_str() : TR("Rueckgaengig"),
+                            TR("Strg+Z"), false, canUndo()))
             undo();
-        if (ImGui::MenuItem(canRedo() ? ("Wiederholen: " + redoLabel()).c_str() : "Wiederholen",
-                            "Strg+Y", false, canRedo()))
+        if (ImGui::MenuItem(canRedo() ? (TR("Wiederholen: ") + redoLabel()).c_str() : TR("Wiederholen"),
+                            TR("Strg+Y"), false, canRedo()))
             redo();
         ImGui::Separator();
-        if (ImGui::MenuItem("Neue Gruppe...", "Strg+G", false, project.loaded))
+        if (ImGui::MenuItem(TR("Neue Gruppe..."), TR("Strg+G"), false, project.loaded))
             dialogs::openNewGroup(*this, selection.kind == SelKind::Group ? selection.id : "");
-        if (ImGui::MenuItem("Neues Element...", "Strg+N", false, project.loaded)) {
+        if (ImGui::MenuItem(TR("Neues Element..."), TR("Strg+N"), false, project.loaded)) {
             std::string groupId = selection.kind == SelKind::Group ? selection.id : "";
             if (groupId.empty() && selection.kind == SelKind::Element) {
                 if (const Element* el = project.element(selection.id)) groupId = el->groupId;
@@ -282,60 +283,71 @@ void Editor::drawMainMenuBar() {
             if (groupId.empty() && !project.groups.empty()) groupId = project.groups.front().id;
             dialogs::openNewElement(*this, groupId);
         }
-        if (ImGui::MenuItem("Neue Aktion...", "Strg+T", false, project.loaded))
+        if (ImGui::MenuItem(TR("Neue Aktion..."), TR("Strg+T"), false, project.loaded))
             dialogs::openNewAction(*this, 0, selection.kind == SelKind::Element ? selection.id : "");
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu("Ansicht")) {
-        if (ImGui::BeginMenu("Design")) {
-            if (ImGui::MenuItem("Hell", nullptr, s.preset == ThemePreset::Light)) {
-                theme::applyPreset(ThemePreset::Light);
-                theme::applyImGuiStyle();
-                theme::save();
-                setStatus("Helles Design aktiv.");
-            }
-            if (ImGui::MenuItem("Dunkel", nullptr, s.preset == ThemePreset::Dark)) {
-                theme::applyPreset(ThemePreset::Dark);
-                theme::applyImGuiStyle();
-                theme::save();
-                setStatus("Dunkles Design aktiv.");
+    if (ImGui::BeginMenu(TR("Ansicht"))) {
+        if (ImGui::BeginMenu(TR("Sprache / Language"))) {
+            for (Language option : {Language::German, Language::English}) {
+                if (ImGui::MenuItem(lang::name(option), nullptr, s.language == option)) {
+                    s.language = option;
+                    lang::set(option);
+                    theme::save();
+                    setStatus(TR(option == Language::German ? "Sprache: Deutsch" : "Sprache: Englisch"));
+                }
             }
             ImGui::EndMenu();
         }
-        ImGui::MenuItem("Einstellungen / Farben", nullptr, &s.showSettings);
-        if (ImGui::MenuItem("Layout zuruecksetzen")) {
+        if (ImGui::BeginMenu(TR("Design"))) {
+            if (ImGui::MenuItem(TR("Hell"), nullptr, s.preset == ThemePreset::Light)) {
+                theme::applyPreset(ThemePreset::Light);
+                theme::applyImGuiStyle();
+                theme::save();
+                setStatus(TR("Helles Design aktiv."));
+            }
+            if (ImGui::MenuItem(TR("Dunkel"), nullptr, s.preset == ThemePreset::Dark)) {
+                theme::applyPreset(ThemePreset::Dark);
+                theme::applyImGuiStyle();
+                theme::save();
+                setStatus(TR("Dunkles Design aktiv."));
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::MenuItem(TR("Einstellungen / Farben"), nullptr, &s.showSettings);
+        if (ImGui::MenuItem(TR("Layout zuruecksetzen"))) {
             ImGui::ClearIniSettings();
             resetLayoutRequested = true;
         }
         ImGui::Separator();
-        ImGui::SliderFloat("Zeilenhoehe Timeline", &s.timelineTrackHeight, 20.0f, 80.0f, "%.0f px");
-        ImGui::Checkbox("Leere Zeitraeume komprimieren", &s.timelineCompressGaps);
-        ImGui::Checkbox("Automatisch speichern", &s.autosave);
+        ImGui::SliderFloat(TR("Zeilenhoehe Timeline"), &s.timelineTrackHeight, 20.0f, 80.0f, "%.0f px");
+        ImGui::Checkbox(TR("Leere Zeitraeume komprimieren"), &s.timelineCompressGaps);
+        ImGui::Checkbox(TR("Automatisch speichern"), &s.autosave);
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu("Fenster")) {
-        ImGui::MenuItem("Timeline", nullptr, &s.showTimeline);
-        ImGui::MenuItem("Gruppen-Manager", nullptr, &s.showGroups);
-        ImGui::MenuItem("Details", nullptr, &s.showDetails);
-        ImGui::MenuItem("Aktionen-Panel", nullptr, &s.showActions);
-        ImGui::MenuItem("Story Visualizer", nullptr, &s.showStory);
-        ImGui::MenuItem("Connections", nullptr, &s.showConnections);
-        ImGui::MenuItem("Dateimanager", nullptr, &s.showFiles);
+    if (ImGui::BeginMenu(TR("Fenster"))) {
+        ImGui::MenuItem(TR("Timeline"), nullptr, &s.showTimeline);
+        ImGui::MenuItem(TR("Gruppen-Manager"), nullptr, &s.showGroups);
+        ImGui::MenuItem(TR("Details"), nullptr, &s.showDetails);
+        ImGui::MenuItem(TR("Aktionen-Panel"), nullptr, &s.showActions);
+        ImGui::MenuItem(TR("Story Visualizer"), nullptr, &s.showStory);
+        ImGui::MenuItem(TR("Connections"), nullptr, &s.showConnections);
+        ImGui::MenuItem(TR("Dateimanager"), nullptr, &s.showFiles);
         ImGui::Separator();
         ImGui::MenuItem("ImGui Demo", nullptr, &s.showDemo);
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu("Hilfe")) {
-        if (ImGui::MenuItem("Tastenkuerzel")) dialogs.shortcuts = true;
-        if (ImGui::MenuItem("Ueber Story Editor")) dialogs.about = true;
+    if (ImGui::BeginMenu(TR("Hilfe"))) {
+        if (ImGui::MenuItem(TR("Tastenkuerzel"))) dialogs.shortcuts = true;
+        if (ImGui::MenuItem(TR("Ueber Story Editor"))) dialogs.about = true;
         ImGui::EndMenu();
     }
 
     // right aligned status / project info
-    std::string info = project.loaded ? project.name + "  |  " + project.vaultPath : "Kein Projekt";
+    std::string info = project.loaded ? project.name + "  |  " + project.vaultPath : TR("Kein Projekt");
     if (!status_.empty() && statusTimer_ > 0.0f) info = status_;
     float width = ImGui::CalcTextSize(info.c_str()).x;
     float avail = ImGui::GetWindowWidth() - width - 20.0f;
@@ -454,17 +466,17 @@ void drawListEditor(Editor& ed, const char* title, std::vector<std::string>& ite
             ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().textSecondary);
             ImGui::Text("%dx", usage);
             ImGui::PopStyleColor();
-            ui::tooltip("So oft wird der Eintrag im Projekt verwendet.");
+            ui::tooltip(TR("So oft wird der Eintrag im Projekt verwendet."));
             ImGui::TableSetColumnIndex(2);
             std::vector<std::string>* list = &items;
-            if (ImGui::SmallButton("Umben.")) {
-                dialogs::prompt(ed, "Eintrag umbenennen", title, item,
+            if (ImGui::SmallButton(TR("Umben."))) {
+                dialogs::prompt(ed, TR("Eintrag umbenennen"), title, item,
                                 [&ed, kind, list, item](const std::string& value) {
                                     std::string name = trim(value);
                                     if (name.empty() || name == item) return;
                                     auto it = std::find(list->begin(), list->end(), item);
                                     if (it == list->end()) return;
-                                    ed.pushUndo("Eintrag umbenannt");
+                                    ed.pushUndo(TR("Eintrag umbenannt"));
                                     *it = name;
                                     replaceUsage(ed, kind, item, name);
                                     ed.markMetadata();
@@ -484,23 +496,23 @@ void drawListEditor(Editor& ed, const char* title, std::vector<std::string>& ite
                     }
                     if (kind == ListKind::Storyline) fallback.clear();
                     dialogs::confirm(
-                        ed, "Eintrag loeschen", "\"" + item + "\" loeschen?",
-                        std::to_string(usage) + " Eintraege benutzen ihn und werden auf \"" +
-                            (fallback.empty() ? std::string("<keine>") : fallback) + "\" gesetzt.",
+                        ed, TR("Eintrag loeschen"), "\"" + item + TR("\" loeschen?"),
+                        std::to_string(usage) + TR(" Eintraege benutzen ihn und werden auf \"") +
+                            (fallback.empty() ? std::string(TR("<keine>")) : fallback) + TR("\" gesetzt."),
                         [&ed, kind, list, item, fallback]() {
-                            ed.pushUndo("Eintrag geloescht");
+                            ed.pushUndo(TR("Eintrag geloescht"));
                             replaceUsage(ed, kind, item, fallback);
                             list->erase(std::remove(list->begin(), list->end(), item), list->end());
                             ed.markMetadata();
                         });
                 }
             }
-            ui::tooltip("Eintrag loeschen");
+            ui::tooltip(TR("Eintrag loeschen"));
             ImGui::PopID();
         }
         ImGui::EndTable();
         if (removeIndex >= 0) {
-            ed.pushUndo("Eintrag geloescht");
+            ed.pushUndo(TR("Eintrag geloescht"));
             items.erase(items.begin() + removeIndex);
             ed.markMetadata();
         }
@@ -508,15 +520,15 @@ void drawListEditor(Editor& ed, const char* title, std::vector<std::string>& ite
         static std::map<std::string, std::string> drafts;
         std::string& draft = drafts[title];
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 46.0f);
-        bool submitted = ImGui::InputTextWithHint("##new", "Neuer Eintrag...", &draft,
+        bool submitted = ImGui::InputTextWithHint("##new", TR("Neuer Eintrag..."), &draft,
                                                   ImGuiInputTextFlags_EnterReturnsTrue);
         ImGui::SameLine();
         if (ImGui::Button("+")) submitted = true;
-        ui::tooltip("Eigenen Eintrag hinzufuegen (Enter geht auch)");
+        ui::tooltip(TR("Eigenen Eintrag hinzufuegen (Enter geht auch)"));
         if (submitted) {
             std::string value = trim(draft);
             if (!value.empty() && std::find(items.begin(), items.end(), value) == items.end()) {
-                ed.pushUndo("Eintrag hinzugefuegt");
+                ed.pushUndo(TR("Eintrag hinzugefuegt"));
                 items.push_back(value);
                 ed.markMetadata();
             }
@@ -530,31 +542,42 @@ void drawListEditor(Editor& ed, const char* title, std::vector<std::string>& ite
 }  // namespace
 
 void drawSettingsWindow(Editor& ed, bool* open) {
-    if (!ImGui::Begin("Einstellungen", open)) {
+    if (!ImGui::Begin(TWIN("Einstellungen", "settings"), open)) {
         ImGui::End();
         return;
     }
     AppSettings& s = theme::settings();
     ColorScheme& c = s.colors;
 
-    if (ImGui::CollapsingHeader("Farben", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::TextUnformatted("Design");
+    if (ImGui::CollapsingHeader(TR("Farben"), ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::TextUnformatted(TR("Sprache / Language"));
+        for (Language option : {Language::German, Language::English}) {
+            if (ImGui::RadioButton(lang::name(option), s.language == option)) {
+                s.language = option;
+                lang::set(option);
+                theme::save();
+            }
+            if (option == Language::German) ImGui::SameLine();
+        }
+        ImGui::Separator();
+        ImGui::TextUnformatted(TR("Design"));
         bool lightActive = s.preset == ThemePreset::Light;
-        if (ImGui::RadioButton("Hell", lightActive)) {
+        if (ImGui::RadioButton(TR("Hell"), lightActive)) {
             theme::applyPreset(ThemePreset::Light);
             theme::applyImGuiStyle();
             theme::save();
         }
         ImGui::SameLine();
-        if (ImGui::RadioButton("Dunkel", !lightActive)) {
+        if (ImGui::RadioButton(TR("Dunkel"), !lightActive)) {
             theme::applyPreset(ThemePreset::Dark);
             theme::applyImGuiStyle();
             theme::save();
         }
         ImGui::SameLine();
-        ui::helpMarker(
-            "Setzt alle Farben auf das gewaehlte Design zurueck. Einzelne Farben lassen sich "
-            "darunter weiter anpassen.");
+        ui::helpMarker((std::string(TR("Setzt alle Farben auf das gewaehlte Design zurueck. "
+                                       "Einzelne Farben lassen sich ")) +
+                        TR("darunter weiter anpassen."))
+                           .c_str());
         ImGui::Separator();
 
         struct Entry {
@@ -562,24 +585,24 @@ void drawSettingsWindow(Editor& ed, bool* open) {
             ImVec4* color;
         };
         Entry entries[] = {
-            {"Text primaer", &c.textPrimary},
-            {"Text sekundaer", &c.textSecondary},
-            {"Hintergrund", &c.backgroundColor},
-            {"Panel", &c.panelBackground},
-            {"Akzent", &c.accentColor},
-            {"Warnung", &c.warningColor},
-            {"Erfolg", &c.successColor},
-            {"Fehler", &c.errorColor},
-            {"Timeline Hintergrund", &c.timelineBackground},
-            {"Timeline Raster", &c.timelineGrid},
-            {"Timeline Spur (alternierend)", &c.timelineTrackAlt},
-            {"Timeline Lineal", &c.timelineRuler},
-            {"Auswahl", &c.selectionColor},
-            {"Hover", &c.hoverColor},
-            {"Ghost (Drag)", &c.ghostColor},
-            {"Verbindungslinie", &c.edgeColor},
-            {"Knoten-Umriss", &c.nodeOutline},
-            {"Block", &c.blockColor},
+            {TR("Text primaer"), &c.textPrimary},
+            {TR("Text sekundaer"), &c.textSecondary},
+            {TR("Hintergrund"), &c.backgroundColor},
+            {TR("Panel"), &c.panelBackground},
+            {TR("Akzent"), &c.accentColor},
+            {TR("Warnung"), &c.warningColor},
+            {TR("Erfolg"), &c.successColor},
+            {TR("Fehler"), &c.errorColor},
+            {TR("Timeline Hintergrund"), &c.timelineBackground},
+            {TR("Timeline Raster"), &c.timelineGrid},
+            {TR("Timeline Spur (alternierend)"), &c.timelineTrackAlt},
+            {TR("Timeline Lineal"), &c.timelineRuler},
+            {TR("Auswahl"), &c.selectionColor},
+            {TR("Hover"), &c.hoverColor},
+            {TR("Ghost (Drag)"), &c.ghostColor},
+            {TR("Verbindungslinie"), &c.edgeColor},
+            {TR("Knoten-Umriss"), &c.nodeOutline},
+            {TR("Block"), &c.blockColor},
         };
         bool changed = false;
         for (Entry& e : entries) {
@@ -591,29 +614,29 @@ void drawSettingsWindow(Editor& ed, bool* open) {
             theme::applyImGuiStyle();
             theme::save();
         }
-        if (ImGui::Button("Design neu laden")) {
+        if (ImGui::Button(TR("Design neu laden"))) {
             theme::applyPreset(s.preset);
             theme::applyImGuiStyle();
             theme::save();
-            ed.setStatus(std::string("Design \"") + theme::presetName(s.preset) + "\" zurueckgesetzt.");
+            ed.setStatus(std::string(TR("Design \"")) + theme::presetName(s.preset) + TR("\" zurueckgesetzt."));
         }
-        ui::tooltip("Verwirft eigene Farbaenderungen und stellt das gewaehlte Design wieder her.");
+        ui::tooltip(TR("Verwirft eigene Farbaenderungen und stellt das gewaehlte Design wieder her."));
     }
 
-    if (ImGui::CollapsingHeader("Gruppen-Farben", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader(TR("Gruppen-Farben"), ImGuiTreeNodeFlags_DefaultOpen)) {
         for (Group& g : ed.project.groups) {
             ImGui::PushID(g.id.c_str());
             ImVec4 col = ed.project.groupColor(g.id);
             if (ImGui::ColorEdit4(ed.project.groupPath(g.id).c_str(), reinterpret_cast<float*>(&col),
                                   ImGuiColorEditFlags_NoInputs)) {
-                ed.pushUndo("Gruppenfarbe");
+                ed.pushUndo(TR("Gruppenfarbe"));
                 g.color = col;
                 g.colorExplicit = true;
                 ed.markMetadata();
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Auto")) {
-                ed.pushUndo("Gruppenfarbe automatisch");
+            if (ImGui::SmallButton(TR("Auto"))) {
+                ed.pushUndo(TR("Gruppenfarbe automatisch"));
                 g.colorExplicit = false;
                 ed.markMetadata();
             }
@@ -621,30 +644,32 @@ void drawSettingsWindow(Editor& ed, bool* open) {
         }
     }
 
-    if (ImGui::CollapsingHeader("Eigene Listen", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader(TR("Eigene Listen"), ImGuiTreeNodeFlags_DefaultOpen)) {
         ui::textSecondary(
-            "Aktions-Typen, Beziehungstypen und Handlungsstraenge gehoeren dir - hier oder direkt "
-            "im jeweiligen Dropdown anlegen.");
-        drawListEditor(ed, "Aktions-Typen", ed.project.actionTypes, ListKind::ActionType);
-        drawListEditor(ed, "Beziehungstypen", ed.project.connectionTypes, ListKind::ConnectionType);
-        drawListEditor(ed, "Handlungsstraenge", ed.project.storylines, ListKind::Storyline);
+            (std::string(TR("Aktions-Typen, Beziehungstypen und Handlungsstraenge gehoeren dir - "
+                            "hier oder direkt ")) +
+             TR("im jeweiligen Dropdown anlegen."))
+                .c_str());
+        drawListEditor(ed, TR("Aktions-Typen"), ed.project.actionTypes, ListKind::ActionType);
+        drawListEditor(ed, TR("Beziehungstypen"), ed.project.connectionTypes, ListKind::ConnectionType);
+        drawListEditor(ed, TR("Handlungsstraenge"), ed.project.storylines, ListKind::Storyline);
     }
 
-    if (ImGui::CollapsingHeader("Timeline")) {
-        ImGui::SliderFloat("Spurhoehe", &s.timelineTrackHeight, 20.0f, 80.0f, "%.0f px");
-        ImGui::SliderFloat("Breite Spurtitel", &s.timelineHeaderWidth, 120.0f, 420.0f, "%.0f px");
-        ImGui::SliderFloat("Min. Abstand", &s.timelineMinGapPx, 4.0f, 120.0f, "%.0f px");
-        ImGui::SliderFloat("Max. Abstand", &s.timelineMaxGapPx, 60.0f, 900.0f, "%.0f px");
-        ImGui::Checkbox("Leere Zeitraeume komprimieren", &s.timelineCompressGaps);
+    if (ImGui::CollapsingHeader(TR("Timeline"))) {
+        ImGui::SliderFloat(TR("Spurhoehe"), &s.timelineTrackHeight, 20.0f, 80.0f, "%.0f px");
+        ImGui::SliderFloat(TR("Breite Spurtitel"), &s.timelineHeaderWidth, 120.0f, 420.0f, "%.0f px");
+        ImGui::SliderFloat(TR("Min. Abstand"), &s.timelineMinGapPx, 4.0f, 120.0f, "%.0f px");
+        ImGui::SliderFloat(TR("Max. Abstand"), &s.timelineMaxGapPx, 60.0f, 900.0f, "%.0f px");
+        ImGui::Checkbox(TR("Leere Zeitraeume komprimieren"), &s.timelineCompressGaps);
     }
 
-    if (ImGui::CollapsingHeader("Allgemein")) {
-        ImGui::Checkbox("Automatisch speichern", &s.autosave);
-        ImGui::TextUnformatted("Schriftgroesse wirkt nach Neustart:");
+    if (ImGui::CollapsingHeader(TR("Allgemein"))) {
+        ImGui::Checkbox(TR("Automatisch speichern"), &s.autosave);
+        ImGui::TextUnformatted(TR("Schriftgroesse wirkt nach Neustart:"));
         ImGui::SliderFloat("##font", &s.fontSize, 12.0f, 28.0f, "%.0f px");
-        if (ImGui::Button("Einstellungen speichern")) {
+        if (ImGui::Button(TR("Einstellungen speichern"))) {
             theme::save();
-            ed.setStatus("Einstellungen gespeichert.");
+            ed.setStatus(TR("Einstellungen gespeichert."));
         }
     }
     ImGui::End();

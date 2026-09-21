@@ -42,21 +42,23 @@ long long minutesPerUnit(TimeUnit u) {
 }
 
 const char* timeUnitLabel(TimeUnit u) {
+    const bool en = englishTexts();
     switch (u) {
-        case TimeUnit::Minute: return "Minute";
-        case TimeUnit::Hour: return "Stunde";
-        case TimeUnit::Day: return "Tag";
-        case TimeUnit::Week: return "Woche";
-        case TimeUnit::Month: return "Monat";
-        case TimeUnit::Year: return "Jahr";
+        case TimeUnit::Minute: return en ? "Minute" : "Minute";
+        case TimeUnit::Hour: return en ? "Hour" : "Stunde";
+        case TimeUnit::Day: return en ? "Day" : "Tag";
+        case TimeUnit::Week: return en ? "Week" : "Woche";
+        case TimeUnit::Month: return en ? "Month" : "Monat";
+        case TimeUnit::Year: return en ? "Year" : "Jahr";
     }
-    return "Tag";
+    return en ? "Day" : "Tag";
 }
 
 const char* const* timeUnitLabels(int* count) {
-    static const char* labels[] = {"Minute", "Stunde", "Tag", "Woche", "Monat", "Jahr"};
+    static const char* de[] = {"Minute", "Stunde", "Tag", "Woche", "Monat", "Jahr"};
+    static const char* en[] = {"Minute", "Hour", "Day", "Week", "Month", "Year"};
     if (count) *count = 6;
-    return labels;
+    return englishTexts() ? en : de;
 }
 
 bool parseStoryTime(const std::string& text, long long* outMinutes) {
@@ -130,7 +132,8 @@ std::string formatStoryTime(long long minutes) {
     long long d = dayOf(minutes);
     long long rest = minutes - (d - 1) * kMinutesPerDay;
     char buf[64];
-    std::snprintf(buf, sizeof(buf), "Tag %lld, %02lld:%02lld", d, rest / 60, rest % 60);
+    std::snprintf(buf, sizeof(buf), englishTexts() ? "Day %lld, %02lld:%02lld" : "Tag %lld, %02lld:%02lld",
+                  d, rest / 60, rest % 60);
     return buf;
 }
 
@@ -141,42 +144,53 @@ std::string formatStoryTimeLong(long long minutes) {
     long long remDays = dayIndex - year * kMonthsPerYear * kDaysPerMonth;
     long long month = remDays / kDaysPerMonth;
     long long day = remDays - month * kDaysPerMonth;
+    const bool en = englishTexts();
     char buf[96];
     if (year == 0 && month == 0) {
-        std::snprintf(buf, sizeof(buf), "Tag %lld, %02lld:%02lld", day + 1, rest / 60, rest % 60);
+        std::snprintf(buf, sizeof(buf), en ? "Day %lld, %02lld:%02lld" : "Tag %lld, %02lld:%02lld",
+                      day + 1, rest / 60, rest % 60);
     } else {
-        std::snprintf(buf, sizeof(buf), "Jahr %lld, Monat %lld, Tag %lld, %02lld:%02lld", year + 1,
-                      month + 1, day + 1, rest / 60, rest % 60);
+        std::snprintf(buf, sizeof(buf),
+                      en ? "Year %lld, month %lld, day %lld, %02lld:%02lld"
+                         : "Jahr %lld, Monat %lld, Tag %lld, %02lld:%02lld",
+                      year + 1, month + 1, day + 1, rest / 60, rest % 60);
     }
     return buf;
 }
 
 std::string formatDayHeadline(long long minutes) {
     char buf[48];
-    std::snprintf(buf, sizeof(buf), "TAG %lld", dayOf(minutes));
+    std::snprintf(buf, sizeof(buf), englishTexts() ? "DAY %lld" : "TAG %lld", dayOf(minutes));
     return buf;
 }
 
 std::string formatDuration(long long minutes) {
     if (minutes < 0) minutes = -minutes;
+    const bool en = englishTexts();
     char buf[64];
     if (minutes < kMinutesPerHour) {
-        std::snprintf(buf, sizeof(buf), "%lld Minute%s", minutes, minutes == 1 ? "" : "n");
+        std::snprintf(buf, sizeof(buf), en ? "%lld minute%s" : "%lld Minute%s", minutes,
+                      minutes == 1 ? "" : (en ? "s" : "n"));
     } else if (minutes < kMinutesPerDay) {
         long long h = minutes / kMinutesPerHour;
-        std::snprintf(buf, sizeof(buf), "%lld Stunde%s", h, h == 1 ? "" : "n");
+        std::snprintf(buf, sizeof(buf), en ? "%lld hour%s" : "%lld Stunde%s", h,
+                      h == 1 ? "" : (en ? "s" : "n"));
     } else if (minutes < 14 * kMinutesPerDay) {
         long long d = minutes / kMinutesPerDay;
-        std::snprintf(buf, sizeof(buf), "%lld Tag%s", d, d == 1 ? "" : "e");
+        std::snprintf(buf, sizeof(buf), en ? "%lld day%s" : "%lld Tag%s", d,
+                      d == 1 ? "" : (en ? "s" : "e"));
     } else if (minutes < kDaysPerMonth * 3 * kMinutesPerDay) {
         long long w = minutes / (7 * kMinutesPerDay);
-        std::snprintf(buf, sizeof(buf), "%lld Woche%s", w, w == 1 ? "" : "n");
+        std::snprintf(buf, sizeof(buf), en ? "%lld week%s" : "%lld Woche%s", w,
+                      w == 1 ? "" : (en ? "s" : "n"));
     } else if (minutes < kMonthsPerYear * kDaysPerMonth * kMinutesPerDay) {
         long long m = minutes / (kDaysPerMonth * kMinutesPerDay);
-        std::snprintf(buf, sizeof(buf), "%lld Monat%s", m, m == 1 ? "" : "e");
+        std::snprintf(buf, sizeof(buf), en ? "%lld month%s" : "%lld Monat%s", m,
+                      m == 1 ? "" : (en ? "s" : "e"));
     } else {
         long long y = minutes / (kMonthsPerYear * kDaysPerMonth * kMinutesPerDay);
-        std::snprintf(buf, sizeof(buf), "%lld Jahr%s", y, y == 1 ? "" : "e");
+        std::snprintf(buf, sizeof(buf), en ? "%lld year%s" : "%lld Jahr%s", y,
+                      y == 1 ? "" : (en ? "s" : "e"));
     }
     return buf;
 }

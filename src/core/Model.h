@@ -125,4 +125,9 @@ std::string defaultValueFor(const FieldDef& f);
 void setGroupPalette(float saturation, float value);
 void groupPalette(float* saturation, float* value);
 
+// Sprache der vom Core erzeugten Texte (Zeitangaben, Markdown-Abschnitte).
+// Language of the texts produced by the core (time stamps, markdown sections).
+void setEnglishTexts(bool english);
+bool englishTexts();
+
 }  // namespace se
