@@ -357,6 +357,23 @@ void testManuscript(Report& r) {
             "manuscript: value after the mutation");
     r.check(rendered.find("Geburtstag") != std::string::npos, "manuscript: action title inserted");
     r.check(rendered.find("@") == std::string::npos, "manuscript: no markers left after rendering");
+    r.check(rendered.find("Tag 2") == std::string::npos,
+            "manuscript: time marker invisible in the finished text");
+    r.check(rendered.find("#") == std::string::npos ||
+                rendered.find("## Kapitel") != std::string::npos,
+            "manuscript: only headings keep their hash");
+
+    // Erzaehlt eine andere Figur, wird ein anderes Feld benutzt
+    FieldDef nick;
+    nick.name = "spitzname";
+    nick.type = FieldType::Text;
+    p.addOwnField(alice, nick);
+    alice.values["spitzname"] = "die Ritterin";
+    r.check(renderManuscript(p, "Er sah @Alice.spitzname kommen.") == "Er sah die Ritterin kommen.",
+            "manuscript: field reference for another point of view");
+    alice.values["spitzname"] = "";
+    r.check(renderManuscript(p, "Er sah @Alice.spitzname kommen.") == "Er sah Alice kommen.",
+            "manuscript: empty field falls back to the name");
 
     std::vector<std::string> mentioned = mentionedElements(p, text);
     r.check(mentioned.size() == 1 && mentioned[0] == alice.id, "manuscript: mentions collected once");

@@ -78,16 +78,17 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
             long long parsed = 0;
             if (parseStoryTime(body, &parsed)) {
                 flushText(i);
+                const size_t markerEnd = lineEnd < text.size() ? lineEnd + 1 : lineEnd;
                 ManuscriptToken t;
                 t.kind = ManuscriptToken::Kind::Time;
                 t.begin = i;
-                t.end = lineEnd;
-                t.raw = text.substr(i, lineEnd - i);
+                t.end = markerEnd;
                 t.time = parsed;
                 t.resolved = true;
+                t.raw = text.substr(i, markerEnd - i);
                 out.push_back(t);
                 currentTime = parsed;
-                i = lineEnd;
+                i = markerEnd;
                 textStart = i;
                 continue;
             }
@@ -167,11 +168,11 @@ std::string renderManuscript(const Project& p, const std::string& text) {
                     break;
                 }
                 const std::string value = p.valueAt(t.targetId, t.field, t.time);
-                out += value.empty() ? t.raw : value;
+                out += value.empty() ? p.displayName(t.targetId) : value;
                 break;
             }
             case ManuscriptToken::Kind::Time:
-                out += formatStoryTime(t.time);
+                // Die Zeitmarke steuert nur die Werte - im fertigen Text steht sie nicht.
                 break;
             case ManuscriptToken::Kind::Action: {
                 const Action* a = p.action(t.targetId);
