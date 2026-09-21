@@ -28,6 +28,10 @@ struct Project {
     std::vector<ConnectionType> connectionTypes;
     std::vector<std::string> storylines{"Main Quest"};
 
+    // Der eigentliche Text der Geschichte. Marken darin verweisen auf
+    // Elemente, Zeitpunkte und Aktionen (siehe core/Manuscript.h).
+    std::string manuscript;
+
     bool loaded = false;
 
     // ----------------------------------------------------------- lookups

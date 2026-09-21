@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "app/Platform.h"
+#include "core/Manuscript.h"
 #include "core/Project.h"
 #include "core/StoryTime.h"
 #include "core/VaultIO.h"
@@ -316,6 +317,65 @@ void testLegacyConnections(Report& r) {
     fs::remove_all(tmp, ec);
 }
 
+
+// Marken im Manuskript: Verweise, Werte zur richtigen Zeit, Aktionen.
+void testManuscript(Report& r) {
+    Project p;
+    Group& chars = p.addGroup("Characters", "");
+    chars.fields.push_back({"age", FieldType::Integer, false, "27", "", "", {}});
+    Element& alice = p.addElement("Alice", chars.id);
+    alice.values["age"] = "27";
+    Action& birthday = p.addAction("Geburtstag", 10 * kMinutesPerDay);
+    birthday.mutations.push_back({alice.id, "age", "27", "28"});
+
+    const std::string text =
+        "## Kapitel 1\n"
+        "#Tag 2, 09:00\n"
+        "@Alice ist @Alice.age Jahre alt.\n\n"
+        "#Tag 12, 09:00\n"
+        "Jetzt ist @Alice schon @Alice.age. !act:" + birthday.id + "\n";
+
+    std::vector<ManuscriptToken> tokens = parseManuscript(p, text);
+    size_t elements = 0, values = 0, times = 0, actions = 0, headings = 0;
+    for (const ManuscriptToken& t : tokens) {
+        if (t.kind == ManuscriptToken::Kind::Element) ++elements;
+        if (t.kind == ManuscriptToken::Kind::Value) ++values;
+        if (t.kind == ManuscriptToken::Kind::Time) ++times;
+        if (t.kind == ManuscriptToken::Kind::Action) ++actions;
+        if (t.kind == ManuscriptToken::Kind::Heading) ++headings;
+    }
+    r.check(elements == 2, "manuscript: two element references");
+    r.check(values == 2, "manuscript: two value references");
+    r.check(times == 2, "manuscript: two time markers");
+    r.check(actions == 1, "manuscript: action marker");
+    r.check(headings == 1, "manuscript: heading");
+
+    const std::string rendered = renderManuscript(p, text);
+    r.check(rendered.find("Alice ist 27 Jahre alt") != std::string::npos,
+            "manuscript: value before the mutation");
+    r.check(rendered.find("Alice schon 28") != std::string::npos,
+            "manuscript: value after the mutation");
+    r.check(rendered.find("Geburtstag") != std::string::npos, "manuscript: action title inserted");
+    r.check(rendered.find("@") == std::string::npos, "manuscript: no markers left after rendering");
+
+    std::vector<std::string> mentioned = mentionedElements(p, text);
+    r.check(mentioned.size() == 1 && mentioned[0] == alice.id, "manuscript: mentions collected once");
+
+    const size_t offset = text.find("Jetzt ist");
+    r.check(timeAtOffset(p, text, offset) == 11 * kMinutesPerDay + 9 * kMinutesPerHour,
+            "manuscript: time at a position");
+
+    size_t begin = 0, end = 0;
+    paragraphAt(text, offset + 3, &begin, &end);
+    r.check(text.substr(begin, end - begin).find("Jetzt ist") != std::string::npos,
+            "manuscript: paragraph found");
+    r.check(countWords("eins zwei  drei\nvier") == 4, "manuscript: word count");
+
+    // unbekannter Name bleibt stehen, statt zu verschwinden
+    const std::string unknown = "@Niemand geht.";
+    r.check(renderManuscript(p, unknown) == unknown, "manuscript: unknown reference kept");
+}
+
 }  // namespace
 
 int createDemoProject(const std::string& vaultPath) {
@@ -414,6 +474,19 @@ int createDemoProject(const std::string& vaultPath) {
     place(alice, castle, 10);
     place(bob, castle, 0);
 
+    p.manuscript =
+        "## Kapitel 1 - Rueckkehr\n"
+        "#Tag 1, 09:00\n"
+        "@Alice kam zurueck, und die Stadt war kleiner, als sie sie in Erinnerung hatte.\n"
+        "Am Markt stand @Bob, der sie zuerst nicht erkannte.\n\n"
+        "\"Du bist es wirklich\", sagte er. @Alice war inzwischen @Alice.age Jahre alt und\n"
+        "hatte die Ruhe von jemandem, der lange unterwegs war.\n\n"
+        "## Kapitel 2 - Der Fund\n"
+        "#Tag 5, 14:00\n"
+        "In der Ruine lag das @Sword, halb im Staub. Es glomm schwach, als @Alice es aufhob.\n\n"
+        "#Tag 11, 08:00\n"
+        "Ein Jahr aelter, @Alice.age nun, stand sie wieder vor der @Castle.\n";
+
     return vault::saveAll(p, &err) ? 0 : 1;
 }
 
@@ -426,6 +499,7 @@ int runSelfTest(const std::string& reportPath) {
     testMarkdownRoundTrip(r);
     testVaultRoundTrip(r);
     testLegacyConnections(r);
+    testManuscript(r);
     r.os << "---------------------\n"
          << r.passed << " ok, " << r.failed << " fehlgeschlagen\n";
 

@@ -109,11 +109,12 @@ void Editor::markConnections() {
     dirtyAll_ = true;  // element files list their relations
 }
 void Editor::markMetadata() { dirtyMetadata_ = true; }
+void Editor::markManuscript() { dirtyManuscript_ = true; }
 
 void Editor::flushSaves() {
     if (!project.loaded || project.vaultPath.empty()) return;
     if (!theme::settings().autosave && !dirtyAll_ && dirtyElements_.empty() && !dirtyActions_ &&
-        !dirtyConnections_ && !dirtyMetadata_)
+        !dirtyConnections_ && !dirtyMetadata_ && !dirtyManuscript_)
         return;
 
     std::string err;
@@ -125,6 +126,7 @@ void Editor::flushSaves() {
         if (dirtyMetadata_) ok = vault::saveMetadata(project, &err) && ok;
         if (dirtyActions_) ok = vault::saveActions(project, &err) && ok;
         if (dirtyConnections_) ok = vault::saveConnections(project, &err) && ok;
+        if (dirtyManuscript_) ok = vault::saveManuscript(project, &err) && ok;
         for (const std::string& id : dirtyElements_) {
             Element* el = project.element(id);
             if (!el) continue;
@@ -136,6 +138,7 @@ void Editor::flushSaves() {
     dirtyMetadata_ = false;
     dirtyActions_ = false;
     dirtyConnections_ = false;
+    dirtyManuscript_ = false;
     dirtyElements_.clear();
     if (!ok && !err.empty()) setStatus(err, true);
 }
@@ -328,6 +331,7 @@ void Editor::drawMainMenuBar() {
     }
 
     if (ImGui::BeginMenu(TR("Fenster"))) {
+        ImGui::MenuItem(TR("Manuskript"), nullptr, &s.showManuscript);
         ImGui::MenuItem(TR("Timeline"), nullptr, &s.showTimeline);
         ImGui::MenuItem(TR("Gruppen-Manager"), nullptr, &s.showGroups);
         ImGui::MenuItem(TR("Details"), nullptr, &s.showDetails);
@@ -395,6 +399,7 @@ void Editor::handleShortcuts() {
 
 void Editor::drawWindows() {
     AppSettings& s = theme::settings();
+    if (s.showManuscript) drawManuscriptWindow(*this, &s.showManuscript);
     if (s.showTimeline) drawTimelineWindow(*this, &s.showTimeline);
     if (s.showGroups) drawGroupManagerWindow(*this, &s.showGroups);
     if (s.showDetails) drawDetailsWindow(*this, &s.showDetails);

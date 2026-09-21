@@ -193,6 +193,7 @@ void Application::drawDockspace() {
 
             ImGui::DockBuilderDockWindow("###groups", leftId);
             ImGui::DockBuilderDockWindow("###details", rightId);
+            ImGui::DockBuilderDockWindow("###manuscript", mainId);
             ImGui::DockBuilderDockWindow("###timeline", mainId);
             ImGui::DockBuilderDockWindow("###actions", bottomId);
             ImGui::DockBuilderDockWindow("###story", bottomId);
@@ -246,7 +247,7 @@ int Application::run() {
     io.ConfigWindowsMoveFromTitleBarOnly = true;
 
     // v2: die Fenster haben feste ###-IDs bekommen, alte Layouts passen nicht mehr.
-    static std::string iniPath = platform::appConfigDir() + "/imgui_layout_v2.ini";
+    static std::string iniPath = platform::appConfigDir() + "/imgui_layout_v3.ini";
     io.IniFilename = iniPath.c_str();
 
     theme::applyImGuiStyle();

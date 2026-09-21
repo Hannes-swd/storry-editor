@@ -4,6 +4,7 @@ namespace se {
 
 class Editor;
 
+void drawManuscriptWindow(Editor& ed, bool* open);
 void drawTimelineWindow(Editor& ed, bool* open);
 void drawGroupManagerWindow(Editor& ed, bool* open);
 void drawDetailsWindow(Editor& ed, bool* open);

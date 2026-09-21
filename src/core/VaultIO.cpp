@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "app/Platform.h"
+#include "core/Manuscript.h"
 #include "core/StoryTime.h"
 
 namespace fs = std::filesystem;
@@ -457,7 +458,8 @@ bool ensureGroupDirs(const Project& p, std::string* err) {
     for (const Group& g : p.groups) {
         if (!platform::ensureDir(absolutePath(p, p.groupPath(g.id)), err)) return false;
     }
-    const char* extra[] = {"Timeline", "Actions", "Connections", "Assets/Images", "Assets/Documents"};
+    const char* extra[] = {"Timeline",      "Actions",        "Connections",
+                           "Manuscript",    "Assets/Images",  "Assets/Documents"};
     for (const char* dir : extra) {
         if (!platform::ensureDir(absolutePath(p, dir), err)) return false;
     }
@@ -534,6 +536,15 @@ bool saveConnections(const Project& p, std::string* err) {
     return platform::writeFile(absolutePath(p, "Connections/relationships.json"), j.dump(2), err);
 }
 
+bool saveManuscript(const Project& p, std::string* err) {
+    // Der Text wird so gespeichert, wie er geschrieben wurde - mit den Marken.
+    // Zusaetzlich eine gerenderte Fassung zum Lesen in Obsidian.
+    if (!platform::writeFile(absolutePath(p, "Manuscript/manuscript.md"), p.manuscript, err))
+        return false;
+    return platform::writeFile(absolutePath(p, "Manuscript/gelesen.md"),
+                               renderManuscript(p, p.manuscript), err);
+}
+
 bool saveElement(const Project& p, Element& el, std::string* err) {
     std::string target = elementRelativePath(p, el);
     if (!el.filePath.empty() && el.filePath != target) {
@@ -559,6 +570,7 @@ bool saveAll(Project& p, std::string* err) {
     if (!saveMetadata(p, err)) return false;
     if (!saveActions(p, err)) return false;
     if (!saveConnections(p, err)) return false;
+    if (!saveManuscript(p, err)) return false;
     for (Element& el : p.elements) {
         if (!saveElement(p, el, err)) return false;
     }
@@ -692,6 +704,8 @@ bool load(const std::string& path, Project& p, std::string* err) {
         }
     }
 
+    platform::readFile(path + "/Manuscript/manuscript.md", &p.manuscript);
+
     std::string connText;
     if (platform::readFile(path + "/Connections/relationships.json", &connText)) {
         try {
@@ -766,6 +780,7 @@ json snapshot(const Project& p) {
         j["node_positions"][kv.first] = json::array({kv.second.x, kv.second.y});
     j["action_types"] = p.actionTypes;
     j["storylines"] = p.storylines;
+    j["manuscript"] = p.manuscript;
     return j;
 }
 
@@ -814,6 +829,7 @@ void restore(const json& j, Project& p) {
         p.storylines.clear();
         for (auto& t : j["storylines"]) p.storylines.push_back(t.get<std::string>());
     }
+    p.manuscript = j.value("manuscript", p.manuscript);
 }
 
 }  // namespace se::vault

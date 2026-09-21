@@ -54,6 +54,7 @@ struct AppSettings {
     std::string lastProjectName;
 
     // window visibility
+    bool showManuscript = true;
     bool showTimeline = true;
     bool showGroups = true;
     bool showActions = true;

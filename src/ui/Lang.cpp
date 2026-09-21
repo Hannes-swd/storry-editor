@@ -479,6 +479,26 @@ const Entry kTable[] = {
     {"\" zurueckgesetzt.", "\" restored."},
     {"Design \"", "Theme \""},
 
+    // ---------------------------------------------------------- Manuskript
+    {"Manuskript", "Manuscript"},
+    {"Schreiben", "Write"},
+    {"Lesen", "Read"},
+    {"Gliederung", "Outline"},
+    {"Aktion aus Absatz", "Action from paragraph"},
+    {"Macht aus dem Absatz am Cursor eine Aktion - Beteiligte und Zeitpunkt kommen aus dem Text.",
+     "Turns the paragraph at the cursor into an action - involved elements and time come from the text."},
+    {"Zeitmarke", "Time marker"},
+    {"Ab dieser Stelle gilt ein neuer Zeitpunkt - Werte im Text richten sich danach.",
+     "From here on a new point in time applies - values in the text follow it."},
+    {"Woerter", "words"},
+    {"Ueberschriften mit ## und Zeitmarken mit # erscheinen hier.",
+     "Headings with ## and time markers with # show up here."},
+    {"Einfach losschreiben. @Name verweist auf ein Element, @Name.feld setzt dessen Wert ein, #Tag 5 setzt den Zeitpunkt.",
+     "Just start writing. @Name refers to an element, @Name.field inserts its value, #Day 5 sets the point in time."},
+    {"Tab uebernimmt, Esc schliesst", "Tab accepts, Esc closes"},
+    {"Nicht gefunden - Name pruefen.", "Not found - check the name."},
+    {"Aktion angelegt: ", "Action created: "},
+
     // ------------------------------------------------- Verbindungstypen
     {"Verbindungstypen", "Connection types"},
     {"Verbindungstypen verwalten...", "Manage connection types..."},

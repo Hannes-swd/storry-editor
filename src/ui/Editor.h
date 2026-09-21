@@ -66,6 +66,7 @@ public:
     void markActions();
     void markConnections();
     void markMetadata();
+    void markManuscript();
     void flushSaves();
 
     void select(SelKind kind, const std::string& id);
@@ -90,6 +91,7 @@ private:
     bool dirtyActions_ = false;
     bool dirtyConnections_ = false;
     bool dirtyMetadata_ = false;
+    bool dirtyManuscript_ = false;
     bool dirtyAll_ = false;
     std::string status_;
     bool statusError_ = false;

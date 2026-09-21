@@ -223,7 +223,7 @@ bool save() {
     j["autosave"] = s.autosave;
     j["last_vault"] = s.lastVault;
     j["last_project_name"] = s.lastProjectName;
-    j["windows"] = {{"timeline", s.showTimeline}, {"groups", s.showGroups},
+    j["windows"] = {{"manuscript", s.showManuscript}, {"timeline", s.showTimeline}, {"groups", s.showGroups},
                     {"actions", s.showActions},   {"story", s.showStory},
                     {"connections", s.showConnections}, {"files", s.showFiles},
                     {"details", s.showDetails},   {"settings", s.showSettings}};
@@ -290,6 +290,7 @@ bool load() {
     s.lastProjectName = j.value("last_project_name", s.lastProjectName);
     if (j.contains("windows")) {
         const json& w = j["windows"];
+        s.showManuscript = w.value("manuscript", s.showManuscript);
         s.showTimeline = w.value("timeline", s.showTimeline);
         s.showGroups = w.value("groups", s.showGroups);
         s.showActions = w.value("actions", s.showActions);

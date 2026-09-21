@@ -661,6 +661,7 @@ void Project::clear() {
     groups.clear();
     elements.clear();
     actions.clear();
+    manuscript.clear();
     connections.clear();
     connectionTypes.clear();
     blocks.clear();

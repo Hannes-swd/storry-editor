@@ -19,6 +19,7 @@ bool saveAll(Project& p, std::string* err);
 bool saveMetadata(const Project& p, std::string* err);
 bool saveActions(const Project& p, std::string* err);
 bool saveConnections(const Project& p, std::string* err);
+bool saveManuscript(const Project& p, std::string* err);
 bool saveElement(const Project& p, Element& el, std::string* err);
 void deleteElementFile(const Project& p, const Element& el);
 bool ensureGroupDirs(const Project& p, std::string* err);

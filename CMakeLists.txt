@@ -76,6 +76,7 @@ add_executable(StoryEditor WIN32
     src/app/Platform.cpp
     src/app/TextureCache.cpp
     src/core/StoryTime.cpp
+    src/core/Manuscript.cpp
     src/core/Model.cpp
     src/core/Project.cpp
     src/core/VaultIO.cpp
@@ -86,6 +87,7 @@ add_executable(StoryEditor WIN32
     src/ui/UiCommon.cpp
     src/ui/Editor.cpp
     src/ui/Dialogs.cpp
+    src/ui/ManuscriptWindow.cpp
     src/ui/TimelineWindow.cpp
     src/ui/GroupManagerWindow.cpp
     src/ui/ActionsWindow.cpp
