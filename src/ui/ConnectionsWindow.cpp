@@ -11,6 +11,8 @@
 #include "imgui_stdlib.h"
 
 #include "core/StoryTime.h"
+#include "imgui_stdlib.h"
+
 #include "ui/Dialogs.h"
 #include "ui/Editor.h"
 #include "ui/Lang.h"
@@ -204,7 +206,7 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
     }
 
     // -------------------------------------------------------------- canvas
-    const float barHeight = anyTemporal ? (st.useTimeSlider ? 92.0f : 34.0f) : 0.0f;
+    const float barHeight = anyTemporal ? (st.useTimeSlider ? 126.0f : 34.0f) : 0.0f;
     ImGui::BeginChild("graph", ImVec2(0, -barHeight), ImGuiChildFlags_Borders,
                       ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove);
     ImVec2 canvasPos = ImGui::GetWindowPos();
@@ -505,7 +507,7 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
         const bool barOpen = ImGui::CollapsingHeader(TR("Zeitleiste"));
         st.useTimeSlider = barOpen;
         if (barOpen) {
-            ui::textSecondary(TR("Es werden nur Verbindungen gezeigt, die an diesem Tag gelten."));
+            ui::textSecondary(TR("Es werden nur Verbindungen gezeigt, die zu diesem Zeitpunkt gelten."));
             long long maxTime = 7 * kMinutesPerDay;
             for (const Action& a : ed.project.actions)
                 maxTime = std::max(maxTime, ed.project.resolveActionTime(a));
@@ -513,24 +515,34 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
                 if (conn.hasStart) maxTime = std::max(maxTime, conn.startTime);
                 if (conn.hasEnd) maxTime = std::max(maxTime, conn.endTime);
             }
-            const int lastDay = static_cast<int>(dayOf(maxTime)) + 1;
-            int day = static_cast<int>(dayOf(st.sliderTime));
+            // Ereignisse als Striche auf der Spur: Aktionen und Wechsel von
+            // zeitlichen Verbindungen.
+            std::vector<std::pair<long long, ImVec4>> marks;
+            for (const Action& a : ed.project.actions)
+                marks.push_back({ed.project.resolveActionTime(a), c.textSecondary});
+            for (const Connection& conn : ed.project.connections) {
+                const ImVec4 col = ed.project.connectionTypeColor(conn.typeId);
+                if (conn.hasStart) marks.push_back({conn.startTime, col});
+                if (conn.hasEnd) marks.push_back({conn.endTime, col});
+            }
 
-            if (ImGui::Button("|<")) day = 1;
+            if (ImGui::Button("|<")) st.sliderTime = 0;
             ui::tooltip(TR("Zum Anfang"));
             ImGui::SameLine();
-            if (ImGui::Button("<") && day > 1) --day;
+            if (ImGui::Button("-1 h")) st.sliderTime = std::max(0LL, st.sliderTime - kMinutesPerHour);
             ImGui::SameLine();
-            if (ImGui::Button(">") && day < lastDay) ++day;
+            if (ImGui::Button("+1 h")) st.sliderTime = std::min(maxTime, st.sliderTime + kMinutesPerHour);
             ImGui::SameLine();
-            if (ImGui::Button(">|")) day = lastDay;
+            if (ImGui::Button(">|")) st.sliderTime = maxTime;
             ui::tooltip(TR("Zum Ende"));
             ImGui::SameLine();
-            ImGui::SetNextItemWidth(-160.0f);
-            ImGui::SliderInt("##timeline", &day, 1, lastDay,
-                             formatDayHeadline(static_cast<long long>(day - 1) * kMinutesPerDay)
-                                 .c_str());
-            st.sliderTime = static_cast<long long>(day - 1) * kMinutesPerDay;
+            ImGui::SetNextItemWidth(130.0f);
+            std::string timeText = formatStoryTime(st.sliderTime);
+            if (ImGui::InputText("##timetext", &timeText, ImGuiInputTextFlags_EnterReturnsTrue)) {
+                long long parsed = 0;
+                if (parseStoryTime(timeText, &parsed)) st.sliderTime = parsed;
+            }
+            ui::tooltip(TR("Zeitpunkt eintippen, Enter uebernimmt"));
 
             ImGui::SameLine();
             int active = 0;
@@ -540,7 +552,10 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
             ImGui::PushStyleColor(ImGuiCol_Text, c.textSecondary);
             ImGui::Text("%d / %d", active, static_cast<int>(ed.project.connections.size()));
             ImGui::PopStyleColor();
-            ui::tooltip(TR("Gueltige Verbindungen an diesem Tag"));
+            ui::tooltip(TR("Gueltige Verbindungen zu diesem Zeitpunkt"));
+
+            // frei bewegliche Spur - jeder Zeitpunkt, nicht nur ganze Tage
+            ui::timeScrubber("##scrub", &st.sliderTime, 0, maxTime + kMinutesPerDay, marks);
         }
     }
 

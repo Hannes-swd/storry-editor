@@ -413,6 +413,78 @@ bool groupCombo(Editor& ed, const char* label, std::string& groupId, bool allowE
     return changed;
 }
 
+bool timeScrubber(const char* id, long long* time, long long minTime, long long maxTime,
+                  const std::vector<std::pair<long long, ImVec4>>& marks, float height) {
+    const ColorScheme& c = theme::colors();
+    if (maxTime <= minTime) maxTime = minTime + kMinutesPerDay;
+
+    const float width = std::max(120.0f, ImGui::GetContentRegionAvail().x);
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton(id, ImVec2(width, height));
+    const bool active = ImGui::IsItemActive();
+    const bool hovered = ImGui::IsItemHovered();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    const float span = static_cast<float>(maxTime - minTime);
+    auto xOf = [&](long long t) {
+        return pos.x + (static_cast<float>(t - minTime) / span) * width;
+    };
+
+    bool changed = false;
+    if (active && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        const float f = std::min(1.0f, std::max(0.0f, (ImGui::GetMousePos().x - pos.x) / width));
+        const long long picked = minTime + static_cast<long long>(f * span);
+        if (picked != *time) {
+            *time = picked;
+            changed = true;
+        }
+    }
+    if (hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+    // Spur
+    const float trackTop = pos.y + height * 0.55f;
+    const float trackBottom = trackTop + 6.0f;
+    dl->AddRectFilled(ImVec2(pos.x, trackTop), ImVec2(pos.x + width, trackBottom),
+                      theme::u32(c.timelineTrackAlt), 3.0f);
+    dl->AddRect(ImVec2(pos.x, trackTop), ImVec2(pos.x + width, trackBottom),
+                theme::u32(c.timelineGrid), 3.0f);
+
+    // Tagesstriche, solange sie nicht zu dicht stehen
+    const long long days = (maxTime - minTime) / kMinutesPerDay + 1;
+    if (days > 0 && width / static_cast<float>(days) > 6.0f) {
+        for (long long d = 0; d <= days; ++d) {
+            const float x = xOf(minTime + d * kMinutesPerDay);
+            dl->AddLine(ImVec2(x, trackTop - 2.0f), ImVec2(x, trackBottom + 2.0f),
+                        theme::u32(c.timelineGrid, 0.7f));
+        }
+    }
+
+    // Ereignisse auf der Spur
+    for (const auto& mark : marks) {
+        const float x = xOf(mark.first);
+        dl->AddLine(ImVec2(x, trackTop - 5.0f), ImVec2(x, trackBottom + 5.0f),
+                    theme::u32(mark.second), 2.0f);
+    }
+
+    // Griff
+    const float handleX = xOf(*time);
+    dl->AddLine(ImVec2(handleX, pos.y + 2.0f), ImVec2(handleX, pos.y + height - 2.0f),
+                theme::u32(c.accentColor), 2.5f);
+    dl->AddTriangleFilled(ImVec2(handleX - 5.0f, pos.y + 2.0f),
+                          ImVec2(handleX + 5.0f, pos.y + 2.0f),
+                          ImVec2(handleX, pos.y + 10.0f), theme::u32(c.accentColor));
+
+    const std::string label = formatStoryTime(*time);
+    const ImVec2 ts = ImGui::CalcTextSize(label.c_str());
+    float labelX = std::min(pos.x + width - ts.x - 2.0f, std::max(pos.x + 2.0f, handleX - ts.x * 0.5f));
+    dl->AddRectFilled(ImVec2(labelX - 3.0f, pos.y + 1.0f),
+                      ImVec2(labelX + ts.x + 3.0f, pos.y + ts.y + 1.0f),
+                      theme::u32(theme::withAlpha(c.backgroundColor, 0.85f)), 3.0f);
+    dl->AddText(ImVec2(labelX, pos.y + 1.0f), theme::u32(c.textPrimary), label.c_str());
+
+    return changed;
+}
+
 void elementChip(Editor& ed, const std::string& elementId, bool sameLine) {
     const Element* el = ed.project.element(elementId);
     if (!el) return;

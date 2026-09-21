@@ -45,6 +45,12 @@ bool elementCombo(Editor& ed, const char* label, std::string& id, bool allowEmpt
 bool groupCombo(Editor& ed, const char* label, std::string& groupId, bool allowEmpty = true,
                 const std::string& excludeSubtree = std::string());
 
+// Frei beweglicher Zeitstrahl: ziehen setzt den Zeitpunkt minutengenau.
+// `marks` sind Zeitpunkte, die als farbige Striche auf der Spur erscheinen.
+// A freely draggable time track: dragging sets the time to the minute.
+bool timeScrubber(const char* id, long long* time, long long minTime, long long maxTime,
+                  const std::vector<std::pair<long long, ImVec4>>& marks, float height = 30.0f);
+
 // Coloured, clickable reference to an element; selects it when clicked.
 void elementChip(Editor& ed, const std::string& elementId, bool sameLine = true);
 

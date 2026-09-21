@@ -509,11 +509,13 @@ const Entry kTable[] = {
      "Places a marker for an action at this spot - invisible in the finished text, purely for "
      "organisation. Shortcut while typing: !"},
     {"Zeitleiste", "Timeline"},
-    {"Es werden nur Verbindungen gezeigt, die an diesem Tag gelten.",
-     "Only connections that apply on this day are shown."},
+
     {"Zum Anfang", "To the beginning"},
     {"Zum Ende", "To the end"},
-    {"Gueltige Verbindungen an diesem Tag", "Connections valid on this day"},
+    {"Gueltige Verbindungen zu diesem Zeitpunkt", "Connections valid at this point in time"},
+    {"Zeitpunkt eintippen, Enter uebernimmt", "Type a point in time, Enter applies"},
+    {"Es werden nur Verbindungen gezeigt, die zu diesem Zeitpunkt gelten.",
+     "Only connections that apply at this point in time are shown."},
     {"Nur zur Orientierung beim Lesen - im Export steht sie nie.",
      "Only for orientation while reading - never part of the export."},
     {"Hier gilt: ", "Applies here: "},
