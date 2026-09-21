@@ -36,6 +36,7 @@ struct ElementDialog {
     std::string elementId;
     std::string name;
     std::map<std::string, std::string> values;
+    std::vector<FieldDef> ownFields;  // nur an diesem Element haengende Felder
     std::string error;
 };
 
@@ -45,10 +46,20 @@ struct TemplateDialog {
     std::vector<FieldDef> fields;  // working copy, written back on "Alle speichern"
 };
 
+// Wohin ein im Feld-Dialog angelegtes Feld gehoert.
+// Where a field created in the field dialog belongs.
+enum class FieldTarget {
+    Template,       // Template der Gruppe
+    ElementDialog,  // das gerade offene "Element bearbeiten"
+    ElementDirect,  // direkt an ein bestehendes Element (Detail-Panel)
+};
+
 struct FieldDialog {
     bool open = false;
     bool isNew = true;
     int index = -1;
+    FieldTarget target = FieldTarget::Template;
+    std::string elementId;  // nur fuer ElementDirect
     FieldDef field;
     std::string enumOptions;  // one option per line
     std::string error;
@@ -133,6 +144,8 @@ void openEditGroup(Editor& ed, const std::string& groupId);
 void openNewElement(Editor& ed, const std::string& groupId);
 void openEditElement(Editor& ed, const std::string& elementId);
 void openTemplate(Editor& ed, const std::string& groupId);
+// Feld-Dialog fuer ein Feld, das nur zu einem Element gehoert.
+void openElementField(Editor& ed, FieldTarget target, const std::string& elementId);
 void openNewAction(Editor& ed, long long time, const std::string& elementId);
 void openEditAction(Editor& ed, const std::string& actionId);
 void openNewConnection(Editor& ed, const std::string& src, const std::string& dst);

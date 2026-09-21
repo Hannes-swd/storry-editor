@@ -57,6 +57,11 @@ struct Project {
 
     // Template fields of a group: inherited from all parents plus own fields.
     std::vector<FieldDef> effectiveFields(const std::string& groupId) const;
+    // Template-Felder der Gruppe plus die elementeigenen Felder.
+    std::vector<FieldDef> fieldsForElement(const Element& el) const;
+    bool isOwnField(const Element& el, const std::string& fieldName) const;
+    void addOwnField(Element& el, const FieldDef& field);
+    void removeOwnField(Element& el, const std::string& fieldName);
     const FieldDef* findField(const std::string& groupId, const std::string& fieldName) const;
 
     ImVec4 groupColor(const std::string& groupId) const;

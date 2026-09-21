@@ -160,6 +160,48 @@ std::vector<FieldDef> Project::effectiveFields(const std::string& groupId) const
     return out;
 }
 
+std::vector<FieldDef> Project::fieldsForElement(const Element& el) const {
+    std::vector<FieldDef> out = effectiveFields(el.groupId);
+    for (const FieldDef& own : el.ownFields) {
+        auto it = std::find_if(out.begin(), out.end(),
+                               [&](const FieldDef& f) { return f.name == own.name; });
+        if (it == out.end())
+            out.push_back(own);
+        else
+            *it = own;  // ein eigenes Feld ueberschreibt die Template-Definition
+    }
+    return out;
+}
+
+bool Project::isOwnField(const Element& el, const std::string& fieldName) const {
+    for (const FieldDef& f : el.ownFields) {
+        if (f.name == fieldName) return true;
+    }
+    return false;
+}
+
+void Project::addOwnField(Element& el, const FieldDef& field) {
+    for (FieldDef& f : el.ownFields) {
+        if (f.name == field.name) {
+            f = field;
+            return;
+        }
+    }
+    el.ownFields.push_back(field);
+    if (el.values.find(field.name) == el.values.end()) el.values[field.name] = defaultValueFor(field);
+    if (std::find(el.fieldOrder.begin(), el.fieldOrder.end(), field.name) == el.fieldOrder.end())
+        el.fieldOrder.push_back(field.name);
+}
+
+void Project::removeOwnField(Element& el, const std::string& fieldName) {
+    el.ownFields.erase(std::remove_if(el.ownFields.begin(), el.ownFields.end(),
+                                      [&](const FieldDef& f) { return f.name == fieldName; }),
+                       el.ownFields.end());
+    el.values.erase(fieldName);
+    el.fieldOrder.erase(std::remove(el.fieldOrder.begin(), el.fieldOrder.end(), fieldName),
+                        el.fieldOrder.end());
+}
+
 const FieldDef* Project::findField(const std::string& groupId, const std::string& fieldName) const {
     static FieldDef cached;
     std::vector<FieldDef> fields = effectiveFields(groupId);
@@ -453,7 +495,7 @@ void Project::removeBlock(const std::string& id) {
 }
 
 void Project::syncElementFields(Element& el) {
-    std::vector<FieldDef> fields = effectiveFields(el.groupId);
+    std::vector<FieldDef> fields = fieldsForElement(el);
     for (const FieldDef& f : fields) {
         if (el.values.find(f.name) == el.values.end()) el.values[f.name] = defaultValueFor(f);
         if (std::find(el.fieldOrder.begin(), el.fieldOrder.end(), f.name) == el.fieldOrder.end())

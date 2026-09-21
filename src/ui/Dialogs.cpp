@@ -31,6 +31,8 @@ void openModal(const char* title, bool open) {
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 }
 
+void drawFieldDialog(Editor& ed);  // wird im Element- und im Template-Dialog verschachtelt
+
 // --------------------------------------------------------------- project
 void drawNewProject(Editor& ed) {
     NewProjectDialog& st = ed.dialogs.newProject;
@@ -145,9 +147,17 @@ void drawElementDialog(Editor& ed) {
     ImGui::InputText("##name", &st.name);
     ImGui::Separator();
 
+    // Template-Felder der Gruppe, danach die Felder, die es nur bei diesem
+    // einen Element gibt.
     std::vector<FieldDef> fields = ed.project.effectiveFields(st.groupId);
-    ImGui::BeginChild("fields", ImVec2(460, std::min(420.0f, 60.0f + 62.0f * fields.size())));
-    for (const FieldDef& f : fields) {
+    const size_t templateCount = fields.size();
+    for (const FieldDef& own : st.ownFields) fields.push_back(own);
+
+    int removeOwn = -1;
+    ImGui::BeginChild("fields", ImVec2(470, std::min(420.0f, 70.0f + 62.0f * fields.size())));
+    for (size_t i = 0; i < fields.size(); ++i) {
+        const FieldDef& f = fields[i];
+        const bool own = i >= templateCount;
         ImGui::PushID(f.name.c_str());
         ImGui::TextUnformatted(f.name.c_str());
         if (f.required) {
@@ -156,6 +166,13 @@ void drawElementDialog(Editor& ed) {
             ImGui::TextUnformatted(TR("* Pflicht"));
             ImGui::PopStyleColor();
         }
+        if (own) {
+            ImGui::SameLine();
+            ui::textSecondary(TR("(nur hier)"));
+            ImGui::SameLine();
+            if (ImGui::SmallButton("X")) removeOwn = static_cast<int>(i - templateCount);
+            ui::tooltip(TR("Feld nur von diesem Element entfernen"));
+        }
         std::string& value = st.values[f.name];
         ui::fieldValueEditor(ed, f, value, f.name.c_str(), st.groupId);
         ImGui::PopID();
@@ -163,6 +180,18 @@ void drawElementDialog(Editor& ed) {
     }
     if (fields.empty()) ui::textSecondary(TR("Diese Gruppe hat noch kein Template."));
     ImGui::EndChild();
+
+    if (removeOwn >= 0 && removeOwn < static_cast<int>(st.ownFields.size())) {
+        st.values.erase(st.ownFields[static_cast<size_t>(removeOwn)].name);
+        st.ownFields.erase(st.ownFields.begin() + removeOwn);
+    }
+
+    if (ImGui::Button(TR("+ Eigenes Feld"))) {
+        dialogs::openElementField(ed, FieldTarget::ElementDialog, std::string());
+    }
+    ImGui::SameLine();
+    ui::helpMarker(TR("Legt ein Feld an, das nur zu diesem Element gehoert - das Template der "
+                      "Gruppe bleibt unveraendert."));
 
     if (!st.error.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().errorColor);
@@ -182,17 +211,31 @@ void drawElementDialog(Editor& ed) {
             if (st.isNew) {
                 ed.pushUndo(TR("Element erstellt"));
                 Element& el = ed.project.addElement(st.name, st.groupId);
+                for (const FieldDef& own : st.ownFields) ed.project.addOwnField(el, own);
                 for (const auto& kv : st.values) el.values[kv.first] = kv.second;
                 if (el.values.count("name")) el.values["name"] = st.name;
                 ed.project.syncElementFields(el);
                 ed.markElement(el.id);
+                ed.markMetadata();
                 ed.select(SelKind::Element, el.id);
                 ed.focusElementId = el.id;
             } else if (Element* el = ed.project.element(st.elementId)) {
                 ed.pushUndo(TR("Element bearbeitet"));
+                // im Dialog entfernte eigene Felder auch am Element loeschen
+                std::vector<std::string> removed;
+                for (const FieldDef& had : el->ownFields) {
+                    bool stillThere = false;
+                    for (const FieldDef& now : st.ownFields) {
+                        if (now.name == had.name) stillThere = true;
+                    }
+                    if (!stillThere) removed.push_back(had.name);
+                }
+                for (const std::string& name : removed) ed.project.removeOwnField(*el, name);
+                for (const FieldDef& own : st.ownFields) ed.project.addOwnField(*el, own);
                 for (const auto& kv : st.values) el->values[kv.first] = kv.second;
                 if (el->name != st.name) ed.renameElement(el->id, st.name);
                 if (el->values.count("name")) el->values["name"] = st.name;
+                ed.markMetadata();
                 ed.project.syncElementFields(*el);
                 ed.markElement(el->id);
             }
@@ -205,6 +248,7 @@ void drawElementDialog(Editor& ed) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
+    drawFieldDialog(ed);
     ImGui::EndPopup();
 }
 
@@ -257,21 +301,54 @@ void drawFieldDialog(Editor& ed) {
         st.error.clear();
         st.field.name = trim(st.field.name);
         if (st.field.name.empty()) st.error = TR("Feldname darf nicht leer sein.");
-        TemplateDialog& tpl = ed.dialogs.templateEditor;
-        for (size_t i = 0; i < tpl.fields.size(); ++i) {
-            if (static_cast<int>(i) == st.index) continue;
-            if (tpl.fields[i].name == st.field.name) st.error = TR("Feldname existiert bereits.");
+
+        // Doppelte Namen je nach Ziel pruefen
+        if (st.target == FieldTarget::Template) {
+            TemplateDialog& tpl = ed.dialogs.templateEditor;
+            for (size_t i = 0; i < tpl.fields.size(); ++i) {
+                if (static_cast<int>(i) == st.index) continue;
+                if (tpl.fields[i].name == st.field.name) st.error = TR("Feldname existiert bereits.");
+            }
+        } else if (st.target == FieldTarget::ElementDialog) {
+            for (size_t i = 0; i < ed.dialogs.element.ownFields.size(); ++i) {
+                if (static_cast<int>(i) == st.index) continue;
+                if (ed.dialogs.element.ownFields[i].name == st.field.name)
+                    st.error = TR("Feldname existiert bereits.");
+            }
+            for (const FieldDef& f : ed.project.effectiveFields(ed.dialogs.element.groupId)) {
+                if (f.name == st.field.name) st.error = TR("Feldname existiert bereits.");
+            }
+        } else if (const Element* el = ed.project.element(st.elementId)) {
+            if (el->values.count(st.field.name) && st.isNew)
+                st.error = TR("Feldname existiert bereits.");
         }
+
         if (st.error.empty()) {
             st.field.enumOptions.clear();
             for (const std::string& line : splitString(st.enumOptions, '\n')) {
                 std::string t = trim(line);
                 if (!t.empty()) st.field.enumOptions.push_back(t);
             }
-            if (st.isNew)
-                tpl.fields.push_back(st.field);
-            else if (st.index >= 0 && st.index < static_cast<int>(tpl.fields.size()))
-                tpl.fields[st.index] = st.field;
+            if (st.target == FieldTarget::Template) {
+                TemplateDialog& tpl = ed.dialogs.templateEditor;
+                if (st.isNew)
+                    tpl.fields.push_back(st.field);
+                else if (st.index >= 0 && st.index < static_cast<int>(tpl.fields.size()))
+                    tpl.fields[st.index] = st.field;
+            } else if (st.target == FieldTarget::ElementDialog) {
+                ElementDialog& eld = ed.dialogs.element;
+                if (!st.isNew && st.index >= 0 && st.index < static_cast<int>(eld.ownFields.size()))
+                    eld.ownFields[st.index] = st.field;
+                else
+                    eld.ownFields.push_back(st.field);
+                if (eld.values.find(st.field.name) == eld.values.end())
+                    eld.values[st.field.name] = defaultValueFor(st.field);
+            } else if (Element* el = ed.project.element(st.elementId)) {
+                ed.pushUndo(TR("Feld hinzugefuegt"));
+                ed.project.addOwnField(*el, st.field);
+                ed.markElement(el->id);
+                ed.markMetadata();
+            }
             st.open = false;
             ImGui::CloseCurrentPopup();
         }
@@ -980,6 +1057,30 @@ void openEditElement(Editor& ed, const std::string& elementId) {
     st.groupId = el->groupId;
     st.name = el->name;
     st.values = el->values;
+    st.ownFields = el->ownFields;
+    // Werte ohne Definition (aus aelteren Projekten oder extern ergaenzt) als
+    // Textfelder anbieten, damit sie im Dialog sichtbar sind.
+    for (const std::string& key : el->fieldOrder) {
+        bool known = ed.project.isOwnField(*el, key);
+        for (const FieldDef& f : ed.project.effectiveFields(el->groupId)) {
+            if (f.name == key) known = true;
+        }
+        if (known) continue;
+        FieldDef loose;
+        loose.name = key;
+        loose.type = FieldType::Text;
+        st.ownFields.push_back(loose);
+    }
+}
+
+void openElementField(Editor& ed, FieldTarget target, const std::string& elementId) {
+    FieldDialog& fd = ed.dialogs.field;
+    fd = FieldDialog{};
+    fd.open = true;
+    fd.isNew = true;
+    fd.index = -1;
+    fd.target = target;
+    fd.elementId = elementId;
 }
 
 void openTemplate(Editor& ed, const std::string& groupId) {

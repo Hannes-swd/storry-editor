@@ -137,6 +137,18 @@ void testVaultRoundTrip(Report& r) {
     alice.values["age"] = "28";
     alice.values["description"] = "Eine mutige Ritterin.";
 
+    // ein Feld, das es nur bei Alice gibt
+    FieldDef nickname;
+    nickname.name = "nickname";
+    nickname.type = FieldType::Text;
+    p.addOwnField(alice, nickname);
+    alice.values["nickname"] = "Die Ritterin";
+    FieldDef luck;
+    luck.name = "luck";
+    luck.type = FieldType::Integer;
+    luck.defaultValue = "7";
+    p.addOwnField(alice, luck);
+
     Group* objects = p.findGroupByPath("Objects");
     Element& sword = p.addElement("Sword", objects->id);
 
@@ -170,6 +182,21 @@ void testVaultRoundTrip(Report& r) {
         r.check(aliceLoaded->id == alice.id, "element id is stable");
         r.check(aliceLoaded->values.at("age") == "28", "field value restored");
         r.check(loaded.valueAt(aliceLoaded->id, "age", 0) == "28", "valueAt before mutation");
+        r.check(aliceLoaded->ownFields.size() == 2, "per element fields restored");
+        r.check(loaded.isOwnField(*aliceLoaded, "luck"), "own field recognised");
+        r.check(aliceLoaded->values.count("nickname") == 1 &&
+                    aliceLoaded->values.at("nickname") == "Die Ritterin",
+                "per element value restored");
+        r.check(aliceLoaded->values.count("luck") == 1 && aliceLoaded->values.at("luck") == "7",
+                "per element default applied");
+        bool typed = false;
+        for (const FieldDef& f : aliceLoaded->ownFields) {
+            if (f.name == "luck" && f.type == FieldType::Integer) typed = true;
+        }
+        r.check(typed, "per element field keeps its type");
+        const Element* bobLoaded = loaded.findElementByPath("Objects/Sword");
+        r.check(bobLoaded && bobLoaded->values.count("nickname") == 0,
+                "per element field stays on that element");
     }
 
     // undo snapshot round trip

@@ -211,12 +211,15 @@ Connection connectionFromJson(const json& j) {
 }
 
 json elementToJson(const Element& e) {
+    json own = json::array();
+    for (const FieldDef& f : e.ownFields) own.push_back(fieldToJson(f));
     return json{{"id", e.id},
                 {"name", e.name},
                 {"group", e.groupId},
                 {"file", e.filePath},
                 {"body", e.body},
                 {"order", e.fieldOrder},
+                {"own_fields", own},
                 {"values", e.values}};
 }
 
@@ -229,6 +232,9 @@ Element elementFromJson(const json& j) {
     e.body = j.value("body", "");
     if (j.contains("order")) {
         for (auto& o : j["order"]) e.fieldOrder.push_back(o.get<std::string>());
+    }
+    if (j.contains("own_fields") && j["own_fields"].is_array()) {
+        for (auto& f : j["own_fields"]) e.ownFields.push_back(fieldFromJson(f));
     }
     if (j.contains("values") && j["values"].is_object()) {
         for (auto it = j["values"].begin(); it != j["values"].end(); ++it)
@@ -388,6 +394,15 @@ bool saveMetadata(const Project& p, std::string* err) {
     for (const auto& kv : p.nodePositions) {
         j["node_positions"][kv.first] = json::array({kv.second.x, kv.second.y});
     }
+    // Felder, die nur an einem einzelnen Element haengen - die .md-Datei kennt
+    // nur den Wert, der Typ steht hier.
+    j["element_fields"] = json::object();
+    for (const Element& el : p.elements) {
+        if (el.ownFields.empty()) continue;
+        json own = json::array();
+        for (const FieldDef& f : el.ownFields) own.push_back(fieldToJson(f));
+        j["element_fields"][el.id] = own;
+    }
     return platform::writeFile(absolutePath(p, "metadata.json"), j.dump(2), err);
 }
 
@@ -532,6 +547,15 @@ bool load(const std::string& path, Project& p, std::string* err) {
         }
     }
 
+    std::map<std::string, std::vector<FieldDef>> elementFields;
+    if (meta.contains("element_fields") && meta["element_fields"].is_object()) {
+        for (auto it = meta["element_fields"].begin(); it != meta["element_fields"].end(); ++it) {
+            std::vector<FieldDef> defs;
+            for (auto& f : it.value()) defs.push_back(fieldFromJson(f));
+            elementFields[it.key()] = defs;
+        }
+    }
+
     // elements live inside the group folders
     for (const Group& g : p.groups) {
         std::string dir = absolutePath(p, p.groupPath(g.id));
@@ -560,7 +584,11 @@ bool load(const std::string& path, Project& p, std::string* err) {
             p.elements.push_back(el);
         }
     }
-    for (Element& el : p.elements) p.syncElementFields(el);
+    for (Element& el : p.elements) {
+        auto it = elementFields.find(el.id);
+        if (it != elementFields.end()) el.ownFields = it->second;
+        p.syncElementFields(el);
+    }
 
     std::string actionsText;
     if (platform::readFile(path + "/Actions/actions.json", &actionsText)) {

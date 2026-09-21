@@ -215,7 +215,8 @@ void drawElementDetails(Editor& ed, Element& el) {
     ImGui::PopStyleColor();
 
     if (ImGui::CollapsingHeader(TR("Felder"), ImGuiTreeNodeFlags_DefaultOpen)) {
-        std::vector<FieldDef> fields = ed.project.effectiveFields(el.groupId);
+        std::vector<FieldDef> fields = ed.project.fieldsForElement(el);
+        std::string removeField;
         for (const std::string& key : el.fieldOrder) {
             auto vit = el.values.find(key);
             if (vit == el.values.end()) continue;
@@ -234,6 +235,14 @@ void drawElementDetails(Editor& ed, Element& el) {
                 ImGui::PushStyleColor(ImGuiCol_Text, c.warningColor);
                 ImGui::TextUnformatted("*");
                 ImGui::PopStyleColor();
+            }
+            const bool ownField = ed.project.isOwnField(el, key);
+            if (ownField) {
+                ImGui::SameLine();
+                ui::textSecondary(TR("(nur hier)"));
+                ImGui::SameLine();
+                if (ImGui::SmallButton("X")) removeField = key;
+                ui::tooltip(TR("Feld nur von diesem Element entfernen"));
             }
             std::string value = vit->second;
             if (ui::fieldValueEditor(ed, *def, value, key.c_str(), el.groupId)) {
@@ -260,16 +269,17 @@ void drawElementDetails(Editor& ed, Element& el) {
             ImGui::PopID();
             ImGui::Spacing();
         }
-        if (ImGui::SmallButton(TR("+ Eigenes Feld"))) {
-            dialogs::prompt(ed, TR("Neues Feld"), TR("Feldname"), "", [&ed, id = el.id](const std::string& v) {
-                Element* target = ed.project.element(id);
-                if (!target || v.empty()) return;
-                ed.pushUndo(TR("Feld hinzugefuegt"));
-                target->values[v] = "";
-                target->fieldOrder.push_back(v);
-                ed.markElement(id);
-            });
+        if (!removeField.empty()) {
+            ed.pushUndo(TR("Feld entfernt"));
+            ed.project.removeOwnField(el, removeField);
+            ed.markElement(el.id);
+            ed.markMetadata();
         }
+        if (ImGui::SmallButton(TR("+ Eigenes Feld")))
+            dialogs::openElementField(ed, FieldTarget::ElementDirect, el.id);
+        ImGui::SameLine();
+        ui::helpMarker(TR("Legt ein Feld an, das nur zu diesem Element gehoert - das Template der "
+                          "Gruppe bleibt unveraendert."));
     }
 
     if (ImGui::CollapsingHeader(TR("Freitext"))) {

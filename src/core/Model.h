@@ -59,6 +59,9 @@ struct Element {
     // as "true"/"false", references as "@Group/Path/Name".
     std::map<std::string, std::string> values;
     std::vector<std::string> fieldOrder;  // includes template + user added fields
+    // Felder, die es nur bei diesem einen Element gibt (Typ, Default, Optionen).
+    // Fields that exist on this single element only.
+    std::vector<FieldDef> ownFields;
     std::string filePath;                 // vault relative, e.g. "Characters/Main/Alice.md"
     std::string body;                     // free text below the field block
 };
