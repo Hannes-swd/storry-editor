@@ -79,6 +79,20 @@ struct ConnectionDialog {
     bool open = false;
     bool isNew = true;
     Connection draft;
+    std::string startText;
+    std::string endText;
+    std::string error;
+};
+
+// Verwaltung der Verbindungstypen (Liste) und der Editor fuer einen Typ.
+struct ConnectionTypeListDialog {
+    bool open = false;
+};
+
+struct ConnectionTypeDialog {
+    bool open = false;
+    bool isNew = true;
+    ConnectionType draft;
 };
 
 struct BlockDialog {
@@ -124,6 +138,8 @@ struct DialogState {
     FieldDialog field;
     ActionDialog action;
     ConnectionDialog connection;
+    ConnectionTypeListDialog connectionTypes;
+    ConnectionTypeDialog connectionType;
     BlockDialog block;
     ConfirmDialog confirm;
     ConflictDialog conflict;
@@ -149,6 +165,12 @@ void openElementField(Editor& ed, FieldTarget target, const std::string& element
 void openNewAction(Editor& ed, long long time, const std::string& elementId);
 void openEditAction(Editor& ed, const std::string& actionId);
 void openNewConnection(Editor& ed, const std::string& src, const std::string& dst);
+// Verbindung eines bestimmten Typs setzen, mit vorbelegter Rolle und Zeitpunkt.
+void openNewConnectionOfType(Editor& ed, const std::string& typeId, size_t role,
+                             const std::string& elementId, bool withTime, long long time);
+void openConnectionTypes(Editor& ed);
+void openNewConnectionType(Editor& ed);
+void openEditConnectionType(Editor& ed, const std::string& typeId);
 void openEditConnection(Editor& ed, const std::string& connectionId);
 void openNewBlock(Editor& ed, const std::vector<std::string>& connectionIds);
 void openMoveElement(Editor& ed, const std::string& elementId);

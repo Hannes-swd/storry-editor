@@ -25,8 +25,7 @@ struct Project {
 
     std::map<std::string, ImVec2> nodePositions;  // connections graph layout
     std::vector<std::string> actionTypes{"Dialogue", "Action", "Scene Change", "Discovery", "Conflict"};
-    std::vector<std::string> connectionTypes{"married_to", "friend_of", "enemy_of", "owns", "guards",
-                                             "member_of", "located_in", "related_to"};
+    std::vector<ConnectionType> connectionTypes;
     std::vector<std::string> storylines{"Main Quest"};
 
     bool loaded = false;
@@ -40,6 +39,12 @@ struct Project {
     const Action* action(const std::string& id) const;
     Connection* connection(const std::string& id);
     Block* block(const std::string& id);
+    ConnectionType* connectionType(const std::string& id);
+    const ConnectionType* connectionType(const std::string& id) const;
+    ConnectionType* connectionTypeByName(const std::string& name);
+    // Legt bei Bedarf einen einfachen Typ mit zwei Rollen an (Altbestand, Import).
+    ConnectionType& ensureConnectionType(const std::string& name);
+    std::string connectionTypeName(const Connection& c) const;
 
     Group* findGroupByPath(const std::string& path);
     Element* findElementByPath(const std::string& path);
@@ -72,6 +77,21 @@ struct Project {
     std::vector<const Action*> sortedActions() const;
     std::vector<const Action*> actionsForElement(const std::string& elementId) const;
     std::vector<const Connection*> connectionsForElement(const std::string& elementId) const;
+    // Gilt die Verbindung zu diesem Zeitpunkt? Nicht-zeitliche gelten immer.
+    bool connectionActiveAt(const Connection& c, long long time) const;
+    // Abschnitte fuer das Timeline-Band: ab wann zeigt das Element worauf.
+    struct BandSegment {
+        long long start = 0;
+        bool hasEnd = false;
+        long long end = 0;
+        std::string labelElementId;
+        std::string connectionId;
+    };
+    std::vector<BandSegment> bandSegments(const std::string& elementId,
+                                          const std::string& typeId) const;
+    // Beendet bei exklusiven Typen die vorherige Setzung an derselben Rolle.
+    void applyExclusivity(const Connection& newer);
+    bool roleAccepts(const ConnectionType& type, size_t role, const std::string& elementId) const;
     // Value of a field at a point in time, mutations applied (spec 3.5.6).
     std::string valueAt(const std::string& elementId, const std::string& field, long long time) const;
     // Every reference to an element: actions, connections and reference fields.
@@ -82,7 +102,9 @@ struct Project {
     Group& addGroup(const std::string& groupName, const std::string& parentId);
     Element& addElement(const std::string& elementName, const std::string& groupId);
     Action& addAction(const std::string& title, long long time);
-    Connection& addConnection(const std::string& src, const std::string& dst, const std::string& type);
+    Connection& addConnection(const std::string& typeId, const std::vector<std::string>& members);
+    ConnectionType& addConnectionType(const std::string& name);
+    void removeConnectionType(const std::string& id);
     Block& addBlock(const std::string& blockName);
 
     void removeGroup(const std::string& id);  // recursive

@@ -166,6 +166,18 @@ void groupPalette(float* saturation, float* value) {
     if (value) *value = g_groupValue;
 }
 
+const std::string& Connection::empty() {
+    static const std::string none;
+    return none;
+}
+
+bool Connection::has(const std::string& elementId) const {
+    for (const std::string& m : members) {
+        if (m == elementId) return true;
+    }
+    return false;
+}
+
 std::string defaultValueFor(const FieldDef& f) {
     if (!f.defaultValue.empty()) return f.defaultValue;
     switch (f.type) {

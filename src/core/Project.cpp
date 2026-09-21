@@ -38,6 +38,27 @@ const Element* Project::element(const std::string& id) const { return findById(e
 Action* Project::action(const std::string& id) { return findById(actions, id); }
 const Action* Project::action(const std::string& id) const { return findById(actions, id); }
 Connection* Project::connection(const std::string& id) { return findById(connections, id); }
+ConnectionType* Project::connectionType(const std::string& id) { return findById(connectionTypes, id); }
+const ConnectionType* Project::connectionType(const std::string& id) const {
+    return findById(connectionTypes, id);
+}
+
+ConnectionType* Project::connectionTypeByName(const std::string& name) {
+    for (ConnectionType& t : connectionTypes) {
+        if (t.name == name) return &t;
+    }
+    return nullptr;
+}
+
+ConnectionType& Project::ensureConnectionType(const std::string& name) {
+    if (ConnectionType* existing = connectionTypeByName(name)) return *existing;
+    return addConnectionType(name);
+}
+
+std::string Project::connectionTypeName(const Connection& c) const {
+    const ConnectionType* t = connectionType(c.typeId);
+    return t ? t->name : std::string("?");
+}
 Block* Project::block(const std::string& id) { return findById(blocks, id); }
 
 Group* Project::findGroupByPath(const std::string& path) {
@@ -334,9 +355,83 @@ std::vector<const Action*> Project::actionsForElement(const std::string& element
 std::vector<const Connection*> Project::connectionsForElement(const std::string& elementId) const {
     std::vector<const Connection*> out;
     for (const auto& c : connections) {
-        if (c.sourceId == elementId || c.targetId == elementId) out.push_back(&c);
+        if (c.has(elementId)) out.push_back(&c);
     }
     return out;
+}
+
+bool Project::connectionActiveAt(const Connection& c, long long time) const {
+    const ConnectionType* t = connectionType(c.typeId);
+    if (!t || !t->temporal) return true;  // zeitlose Verbindungen gelten immer
+    if (c.hasStart && time < c.startTime) return false;
+    if (c.hasEnd && time >= c.endTime) return false;
+    return true;
+}
+
+std::vector<Project::BandSegment> Project::bandSegments(const std::string& elementId,
+                                                        const std::string& typeId) const {
+    const ConnectionType* type = connectionType(typeId);
+    std::vector<BandSegment> out;
+    if (!type || !type->temporal) return out;
+    const size_t bandRole = static_cast<size_t>(type->bandRole < 0 ? 0 : type->bandRole);
+    const size_t labelRole = static_cast<size_t>(type->labelRole < 0 ? 0 : type->labelRole);
+
+    for (const Connection& c : connections) {
+        if (c.typeId != typeId) continue;
+        if (bandRole >= c.members.size() || c.members[bandRole] != elementId) continue;
+        BandSegment seg;
+        seg.start = c.hasStart ? c.startTime : 0;
+        seg.hasEnd = c.hasEnd;
+        seg.end = c.endTime;
+        seg.labelElementId = labelRole < c.members.size() ? c.members[labelRole] : std::string();
+        seg.connectionId = c.id;
+        out.push_back(seg);
+    }
+    std::sort(out.begin(), out.end(),
+              [](const BandSegment& a, const BandSegment& b) { return a.start < b.start; });
+
+    // Bei exklusiven Typen endet ein Abschnitt spaetestens, wenn der naechste beginnt.
+    if (type->exclusive) {
+        for (size_t i = 0; i + 1 < out.size(); ++i) {
+            if (!out[i].hasEnd || out[i].end > out[i + 1].start) {
+                out[i].hasEnd = true;
+                out[i].end = out[i + 1].start;
+            }
+        }
+    }
+    return out;
+}
+
+void Project::applyExclusivity(const Connection& newer) {
+    const ConnectionType* type = connectionType(newer.typeId);
+    if (!type || !type->temporal || !type->exclusive) return;
+    const size_t bandRole = static_cast<size_t>(type->bandRole < 0 ? 0 : type->bandRole);
+    if (bandRole >= newer.members.size()) return;
+    const std::string holder = newer.members[bandRole];
+    const long long from = newer.hasStart ? newer.startTime : 0;
+
+    for (Connection& other : connections) {
+        if (other.id == newer.id || other.typeId != newer.typeId) continue;
+        if (bandRole >= other.members.size() || other.members[bandRole] != holder) continue;
+        const long long otherStart = other.hasStart ? other.startTime : 0;
+        if (otherStart >= from) continue;  // spaetere Setzungen bleiben unberuehrt
+        if (other.hasEnd && other.endTime <= from) continue;
+        other.hasEnd = true;
+        other.endTime = from;
+    }
+}
+
+bool Project::roleAccepts(const ConnectionType& type, size_t role,
+                          const std::string& elementId) const {
+    if (role >= type.roles.size()) return false;
+    const ConnectionRole& r = type.roles[role];
+    if (r.allowedGroups.empty()) return true;  // alle Gruppen erlaubt
+    const Element* el = element(elementId);
+    if (!el) return false;
+    for (const std::string& groupId : r.allowedGroups) {
+        if (isAncestorGroup(groupId, el->groupId)) return true;
+    }
+    return false;
 }
 
 std::string Project::valueAt(const std::string& elementId, const std::string& field,
@@ -366,10 +461,14 @@ std::vector<std::string> Project::referencesTo(const std::string& elementId) con
         if (hit) out.push_back("Aktion: " + a.title);
     }
     for (const auto& c : connections) {
-        if (c.sourceId == elementId || c.targetId == elementId) {
-            const std::string other = c.sourceId == elementId ? c.targetId : c.sourceId;
-            out.push_back("Connection: " + c.type + " -> " + displayName(other));
+        if (!c.has(elementId)) continue;
+        std::string others;
+        for (const std::string& m : c.members) {
+            if (m == elementId) continue;
+            if (!others.empty()) others += ", ";
+            others += displayName(m);
         }
+        out.push_back("Connection: " + connectionTypeName(c) + " -> " + others);
     }
     for (const auto& e : elements) {
         if (e.id == elementId) continue;
@@ -413,15 +512,33 @@ Action& Project::addAction(const std::string& title, long long time) {
     return actions.back();
 }
 
-Connection& Project::addConnection(const std::string& src, const std::string& dst,
-                                   const std::string& type) {
+Connection& Project::addConnection(const std::string& typeId,
+                                   const std::vector<std::string>& members) {
     Connection c;
     c.id = newId("conn");
-    c.sourceId = src;
-    c.targetId = dst;
-    c.type = type;
+    c.typeId = typeId;
+    c.members = members;
     connections.push_back(c);
     return connections.back();
+}
+
+ConnectionType& Project::addConnectionType(const std::string& name) {
+    ConnectionType t;
+    t.id = newId("ctype");
+    t.name = name;
+    t.roles.push_back({"A", {}});
+    t.roles.push_back({"B", {}});
+    connectionTypes.push_back(t);
+    return connectionTypes.back();
+}
+
+void Project::removeConnectionType(const std::string& id) {
+    connections.erase(std::remove_if(connections.begin(), connections.end(),
+                                     [&](const Connection& c) { return c.typeId == id; }),
+                      connections.end());
+    connectionTypes.erase(std::remove_if(connectionTypes.begin(), connectionTypes.end(),
+                                         [&](const ConnectionType& t) { return t.id == id; }),
+                          connectionTypes.end());
 }
 
 Block& Project::addBlock(const std::string& blockName) {
@@ -456,9 +573,7 @@ void Project::removeElement(const std::string& id) {
                           a.mutations.end());
     }
     connections.erase(std::remove_if(connections.begin(), connections.end(),
-                                     [&](const Connection& c) {
-                                         return c.sourceId == id || c.targetId == id;
-                                     }),
+                                     [&](const Connection& c) { return c.has(id); }),
                       connections.end());
     nodePositions.erase(id);
     elements.erase(std::remove_if(elements.begin(), elements.end(),
@@ -531,6 +646,7 @@ void Project::clear() {
     elements.clear();
     actions.clear();
     connections.clear();
+    connectionTypes.clear();
     blocks.clear();
     nodePositions.clear();
     loaded = false;

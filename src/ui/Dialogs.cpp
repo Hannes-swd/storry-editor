@@ -658,6 +658,204 @@ void drawActionDialog(Editor& ed) {
     ImGui::EndPopup();
 }
 
+
+// ------------------------------------------------- Verbindungstypen (Vorlage)
+void drawConnectionTypeDialog(Editor& ed) {
+    ConnectionTypeDialog& st = ed.dialogs.connectionType;
+    const char* title = st.isNew ? TR("Neuer Verbindungstyp") : TR("Verbindungstyp bearbeiten");
+    openModal(title, st.open);
+    if (!ImGui::BeginPopupModal(title, &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
+
+    ImGui::TextUnformatted(TR("Name der Verbindung"));
+    ImGui::SetNextItemWidth(340.0f);
+    ImGui::InputTextWithHint("##name", TR("z.B. Person an Ort"), &st.draft.name);
+
+    ImGui::Spacing();
+    ImGui::TextUnformatted(TR("Rollen - wer oder was wird hier verbunden?"));
+    ui::textSecondary(TR("Pro Rolle festlegen, aus welchen Gruppen gewaehlt werden darf."));
+
+    int removeRole = -1;
+    for (size_t i = 0; i < st.draft.roles.size(); ++i) {
+        ConnectionRole& role = st.draft.roles[i];
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::Text("%d.", static_cast<int>(i) + 1);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(150.0f);
+        ImGui::InputTextWithHint("##rolename", TR("Rollenname"), &role.name);
+        ImGui::SameLine();
+
+        std::string preview = role.allowedGroups.empty() ? TR("alle Gruppen") : std::string();
+        for (const std::string& g : role.allowedGroups) {
+            if (!preview.empty()) preview += ", ";
+            preview += ed.project.groupPath(g);
+        }
+        ImGui::SetNextItemWidth(220.0f);
+        if (ImGui::BeginCombo("##groups", preview.c_str())) {
+            bool all = role.allowedGroups.empty();
+            if (ImGui::Checkbox(TR("alle Gruppen"), &all)) {
+                if (all) role.allowedGroups.clear();
+            }
+            ImGui::Separator();
+            for (const Group& g : ed.project.groups) {
+                bool on = std::find(role.allowedGroups.begin(), role.allowedGroups.end(), g.id) !=
+                          role.allowedGroups.end();
+                ui::colorDot(ed.project.groupColor(g.id));
+                if (ImGui::Checkbox((ed.project.groupPath(g.id) + "##" + g.id).c_str(), &on)) {
+                    if (on)
+                        role.allowedGroups.push_back(g.id);
+                    else
+                        role.allowedGroups.erase(
+                            std::remove(role.allowedGroups.begin(), role.allowedGroups.end(), g.id),
+                            role.allowedGroups.end());
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (st.draft.roles.size() > 2) {
+            ImGui::SameLine();
+            if (ImGui::SmallButton("X")) removeRole = static_cast<int>(i);
+        }
+        ImGui::PopID();
+    }
+    if (removeRole >= 0) st.draft.roles.erase(st.draft.roles.begin() + removeRole);
+    if (ImGui::Button(TR("+ Rolle"))) st.draft.roles.push_back({TR("Rolle"), {}});
+
+    ImGui::Separator();
+    ImGui::Checkbox(TR("Ueber die Timeline setzbar (zeitlich)"), &st.draft.temporal);
+    ui::helpMarker(TR("Zeitliche Verbindungen gelten ab einem Zeitpunkt, koennen beliebig oft neu "
+                      "gesetzt werden und erscheinen als Band in der Timeline."));
+    if (st.draft.temporal) {
+        ImGui::Indent(16.0f);
+        ImGui::Checkbox(TR("pro Element nur eine gleichzeitig"), &st.draft.exclusive);
+        ui::helpMarker(TR("Beim Setzen einer neuen Verbindung endet die vorherige automatisch - "
+                          "passend z.B. fuer einen Aufenthaltsort."));
+        ImGui::Checkbox(TR("Band in der Timeline zeichnen"), &st.draft.showBand);
+
+        std::vector<std::string> roleNames;
+        for (const ConnectionRole& r : st.draft.roles) roleNames.push_back(r.name);
+        if (!roleNames.empty()) {
+            int band = std::min<int>(st.draft.bandRole, static_cast<int>(roleNames.size()) - 1);
+            int label = std::min<int>(st.draft.labelRole, static_cast<int>(roleNames.size()) - 1);
+            std::vector<const char*> items;
+            for (const std::string& n : roleNames) items.push_back(n.c_str());
+            ImGui::SetNextItemWidth(180.0f);
+            if (ImGui::Combo(TR("Band laeuft in der Spur von"), &band, items.data(),
+                             static_cast<int>(items.size())))
+                st.draft.bandRole = band;
+            ImGui::SetNextItemWidth(180.0f);
+            if (ImGui::Combo(TR("Beschriftet mit"), &label, items.data(),
+                             static_cast<int>(items.size())))
+                st.draft.labelRole = label;
+        }
+        ImGui::Unindent(16.0f);
+    }
+
+    ImGui::Checkbox(TR("Eigene Farbe"), &st.draft.colorExplicit);
+    if (st.draft.colorExplicit) {
+        ImGui::SameLine();
+        ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&st.draft.color),
+                          ImGuiColorEditFlags_NoInputs);
+    }
+
+    ImGui::Separator();
+    bool valid = !trim(st.draft.name).empty() && st.draft.roles.size() >= 2;
+    if (!valid) ImGui::BeginDisabled();
+    if (ImGui::Button(TR("Speichern"), ImVec2(120, 0))) {
+        ed.pushUndo(st.isNew ? TR("Verbindungstyp erstellt") : TR("Verbindungstyp bearbeitet"));
+        if (st.isNew) {
+            ConnectionType& t = ed.project.addConnectionType(st.draft.name);
+            const std::string id = t.id;
+            t = st.draft;
+            t.id = id;
+        } else if (ConnectionType* t = ed.project.connectionType(st.draft.id)) {
+            *t = st.draft;
+        }
+        ed.markMetadata();
+        ed.markConnections();
+        st.open = false;
+        ImGui::CloseCurrentPopup();
+    }
+    if (!valid) ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
+        st.open = false;
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+}
+
+void drawConnectionTypeList(Editor& ed) {
+    ConnectionTypeListDialog& st = ed.dialogs.connectionTypes;
+    openModal(TR("Verbindungstypen"), st.open);
+    if (ImGui::BeginPopupModal(TR("Verbindungstypen"), &st.open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ui::textSecondary(TR("Eine Vorlage legt fest, was womit verbunden wird - und ob sich das "
+                             "ueber die Zeit aendern darf."));
+        ImGui::Separator();
+
+        if (ed.project.connectionTypes.empty()) ui::textSecondary(TR("Noch keine Verbindungstypen."));
+        std::string removeId;
+        for (const ConnectionType& t : ed.project.connectionTypes) {
+            ImGui::PushID(t.id.c_str());
+            ui::colorDot(t.colorExplicit ? t.color : theme::colors().edgeColor);
+            ImGui::TextUnformatted(t.name.c_str());
+            ImGui::SameLine(220.0f);
+
+            std::string roles;
+            for (const ConnectionRole& r : t.roles) {
+                if (!roles.empty()) roles += " + ";
+                roles += r.name;
+            }
+            ui::textSecondary(roles.c_str());
+            ImGui::SameLine(420.0f);
+            if (t.temporal) {
+                ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().successColor);
+                ImGui::TextUnformatted(t.exclusive ? TR("zeitlich, exklusiv") : TR("zeitlich"));
+                ImGui::PopStyleColor();
+            } else {
+                ui::textSecondary(TR("fest"));
+            }
+            ImGui::SameLine(560.0f);
+            int count = 0;
+            for (const Connection& c : ed.project.connections) {
+                if (c.typeId == t.id) ++count;
+            }
+            ImGui::Text("%dx", count);
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("Bearbeiten"))) openEditConnectionType(ed, t.id);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("X")) removeId = t.id;
+            ImGui::PopID();
+        }
+        if (!removeId.empty()) {
+            const ConnectionType* t = ed.project.connectionType(removeId);
+            std::string name = t ? t->name : std::string();
+            int count = 0;
+            for (const Connection& c : ed.project.connections) {
+                if (c.typeId == removeId) ++count;
+            }
+            confirm(ed, TR("Verbindungstyp loeschen"), name + TR("\" loeschen?"),
+                    count > 0 ? std::to_string(count) + TR(" gesetzte Verbindungen werden mitgeloescht.")
+                              : std::string(),
+                    [&ed, removeId]() {
+                        ed.pushUndo(TR("Verbindungstyp geloescht"));
+                        ed.project.removeConnectionType(removeId);
+                        ed.markMetadata();
+                        ed.markConnections();
+                    });
+        }
+
+        ImGui::Separator();
+        if (ImGui::Button(TR("+ Neuer Typ"))) openNewConnectionType(ed);
+        ImGui::SameLine();
+        if (ImGui::Button(TR("Schliessen"), ImVec2(120, 0))) {
+            st.open = false;
+            ImGui::CloseCurrentPopup();
+        }
+        drawConnectionTypeDialog(ed);
+        ImGui::EndPopup();
+    }
+}
+
 // ------------------------------------------------------------ connection
 void drawConnectionDialog(Editor& ed) {
     ConnectionDialog& st = ed.dialogs.connection;
@@ -665,23 +863,98 @@ void drawConnectionDialog(Editor& ed) {
     openModal(title, st.open);
     if (!ImGui::BeginPopupModal(title, &st.open, ImGuiWindowFlags_AlwaysAutoResize)) return;
 
-    ImGui::SetNextItemWidth(300.0f);
-    ui::elementCombo(ed, TR("Von"), st.draft.sourceId, false);
-    ImGui::SetNextItemWidth(300.0f);
-    ui::elementCombo(ed, TR("Nach"), st.draft.targetId, false);
+    // ---- Typ waehlen; er bestimmt Rollen und Zeitverhalten
+    std::vector<std::string> typeNames;
+    for (const ConnectionType& t : ed.project.connectionTypes) typeNames.push_back(t.name);
+    std::string currentName;
+    if (const ConnectionType* t = ed.project.connectionType(st.draft.typeId)) currentName = t->name;
 
-    bool typeAdded = false;
-    ImGui::SetNextItemWidth(220.0f);
-    ui::editableCombo(TR("Typ"), ed.project.connectionTypes, st.draft.type, false, &typeAdded);
-    ui::tooltip(TR("Eigene Beziehungstypen (z.B. mentor_of) koennen direkt im Dropdown angelegt werden."));
-    if (typeAdded) ed.markMetadata();
+    ImGui::SetNextItemWidth(240.0f);
+    if (ui::comboStrings(TR("Typ"), typeNames, currentName, false)) {
+        if (ConnectionType* picked = ed.project.connectionTypeByName(currentName)) {
+            st.draft.typeId = picked->id;
+            st.draft.members.assign(picked->roles.size(), std::string());
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Typen verwalten..."))) openConnectionTypes(ed);
+
+    const ConnectionType* type = ed.project.connectionType(st.draft.typeId);
+    if (!type) {
+        ui::textSecondary(TR("Zuerst einen Verbindungstyp anlegen."));
+        ImGui::Separator();
+        if (ImGui::Button(TR("Abbrechen"), ImVec2(120, 0))) {
+            st.open = false;
+            ImGui::CloseCurrentPopup();
+        }
+        drawConnectionTypeList(ed);
+        ImGui::EndPopup();
+        return;
+    }
+
+    st.draft.members.resize(type->roles.size());
+    ImGui::Separator();
+
+    // ---- je Rolle ein Element, gefiltert nach den erlaubten Gruppen
+    for (size_t i = 0; i < type->roles.size(); ++i) {
+        const ConnectionRole& role = type->roles[i];
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::TextUnformatted(role.name.c_str());
+        if (!role.allowedGroups.empty()) {
+            ImGui::SameLine();
+            std::string groups;
+            for (const std::string& g : role.allowedGroups) {
+                if (!groups.empty()) groups += ", ";
+                groups += ed.project.groupPath(g);
+            }
+            ui::textSecondary(("(" + groups + ")").c_str());
+        }
+        std::string& member = st.draft.members[i];
+        std::string preview = member.empty() ? TR("<keins>") : ed.project.elementPath(member);
+        ImGui::SetNextItemWidth(320.0f);
+        if (ImGui::BeginCombo("##member", preview.c_str())) {
+            for (const Element& el : ed.project.elements) {
+                if (!ed.project.roleAccepts(*type, i, el.id)) continue;
+                ui::colorDot(ed.project.elementColor(el.id));
+                if (ImGui::Selectable((ed.project.elementPath(el.id) + "##" + el.id).c_str(),
+                                      el.id == member))
+                    member = el.id;
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::PopID();
+    }
+
+    // ---- Zeitraum nur bei zeitlichen Typen
+    if (type->temporal) {
+        ImGui::Separator();
+        ImGui::SetNextItemWidth(160.0f);
+        ImGui::InputTextWithHint(TR("Ab"), "Tag 1, 00:00", &st.startText);
+        ImGui::SameLine();
+        long long parsed = 0;
+        if (parseStoryTime(st.startText, &parsed)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().successColor);
+            ImGui::TextUnformatted(formatStoryTime(parsed).c_str());
+            ImGui::PopStyleColor();
+        } else {
+            ui::textSecondary(TR("leer = von Anfang an"));
+        }
+        ImGui::SetNextItemWidth(160.0f);
+        ImGui::InputTextWithHint(TR("Bis"), TR("offen"), &st.endText);
+        ImGui::SameLine();
+        if (parseStoryTime(st.endText, &parsed)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().successColor);
+            ImGui::TextUnformatted(formatStoryTime(parsed).c_str());
+            ImGui::PopStyleColor();
+        } else if (type->exclusive) {
+            ui::textSecondary(TR("leer = bis zur naechsten Setzung"));
+        } else {
+            ui::textSecondary(TR("leer = offen"));
+        }
+    }
 
     ImGui::TextUnformatted(TR("Beschreibung"));
-    ImGui::InputTextMultiline("##desc", &st.draft.description, ImVec2(360, 70));
-    ImGui::SetNextItemWidth(160.0f);
-    ImGui::InputTextWithHint(TR("Von (Zeit)"), "Tag 1", &st.draft.startDate);
-    ImGui::SetNextItemWidth(160.0f);
-    ImGui::InputTextWithHint(TR("Bis (Zeit)"), TR("offen"), &st.draft.endDate);
+    ImGui::InputTextMultiline("##desc", &st.draft.description, ImVec2(360, 60));
 
     {
         std::vector<std::string> names;
@@ -698,7 +971,6 @@ void drawConnectionDialog(Editor& ed) {
                 if (b.name == current) st.draft.blockId = b.id;
             }
             if (blockAdded && st.draft.blockId.empty() && !current.empty()) {
-                // a name typed into the dropdown creates the block
                 Block& created = ed.project.addBlock(current);
                 st.draft.blockId = created.id;
                 ed.markConnections();
@@ -707,22 +979,58 @@ void drawConnectionDialog(Editor& ed) {
         ui::tooltip(TR("Bloecke fassen zusammengehoerende Verbindungen zusammen - hier auch neu anlegbar."));
     }
 
+    if (!st.error.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, theme::colors().errorColor);
+        ImGui::TextUnformatted(st.error.c_str());
+        ImGui::PopStyleColor();
+    }
+
     ImGui::Separator();
-    bool valid = !st.draft.sourceId.empty() && !st.draft.targetId.empty() &&
-                 st.draft.sourceId != st.draft.targetId;
+    bool valid = true;
+    for (const std::string& m : st.draft.members) {
+        if (m.empty()) valid = false;
+    }
     if (!valid) ImGui::BeginDisabled();
     if (ImGui::Button(TR("Speichern"), ImVec2(120, 0))) {
-        if (st.isNew) {
-            ed.pushUndo(TR("Verbindung erstellt"));
-            st.draft.id = newId("conn");
-            ed.project.connections.push_back(st.draft);
-        } else if (Connection* conn = ed.project.connection(st.draft.id)) {
-            ed.pushUndo(TR("Verbindung bearbeitet"));
-            *conn = st.draft;
+        st.error.clear();
+        st.draft.hasStart = false;
+        st.draft.hasEnd = false;
+        if (type->temporal) {
+            long long parsed = 0;
+            if (!trim(st.startText).empty()) {
+                if (parseStoryTime(st.startText, &parsed)) {
+                    st.draft.hasStart = true;
+                    st.draft.startTime = parsed;
+                } else {
+                    st.error = TR("Zeitpunkt nicht lesbar (z.B. \"Tag 5, 14:00\").");
+                }
+            }
+            if (st.error.empty() && !trim(st.endText).empty()) {
+                if (parseStoryTime(st.endText, &parsed)) {
+                    st.draft.hasEnd = true;
+                    st.draft.endTime = parsed;
+                } else {
+                    st.error = TR("Zeitpunkt nicht lesbar (z.B. \"Tag 5, 14:00\").");
+                }
+            }
         }
-        ed.markConnections();
-        st.open = false;
-        ImGui::CloseCurrentPopup();
+        if (st.error.empty()) {
+            std::string savedId = st.draft.id;
+            if (st.isNew) {
+                ed.pushUndo(TR("Verbindung erstellt"));
+                st.draft.id = newId("conn");
+                savedId = st.draft.id;
+                ed.project.connections.push_back(st.draft);
+            } else if (Connection* conn = ed.project.connection(st.draft.id)) {
+                ed.pushUndo(TR("Verbindung bearbeitet"));
+                *conn = st.draft;
+            }
+            if (const Connection* saved = ed.project.connection(savedId))
+                ed.project.applyExclusivity(*saved);
+            ed.markConnections();
+            st.open = false;
+            ImGui::CloseCurrentPopup();
+        }
     }
     if (!valid) ImGui::EndDisabled();
     ImGui::SameLine();
@@ -730,6 +1038,7 @@ void drawConnectionDialog(Editor& ed) {
         st.open = false;
         ImGui::CloseCurrentPopup();
     }
+    drawConnectionTypeList(ed);
     ImGui::EndPopup();
 }
 
@@ -748,8 +1057,12 @@ void drawBlockDialog(Editor& ed) {
     for (const std::string& id : st.connectionIds) {
         const Connection* conn = ed.project.connection(id);
         if (!conn) continue;
-        ImGui::BulletText("%s %s %s", ed.project.displayName(conn->sourceId).c_str(),
-                          conn->type.c_str(), ed.project.displayName(conn->targetId).c_str());
+        std::string members;
+        for (const std::string& m : conn->members) {
+            if (!members.empty()) members += " + ";
+            members += ed.project.displayName(m);
+        }
+        ImGui::BulletText("%s: %s", ed.project.connectionTypeName(*conn).c_str(), members.c_str());
     }
     if (st.connectionIds.empty())
         ui::textSecondary(TR("Keine Verbindungen zwischen den markierten Knoten gefunden."));
@@ -1121,10 +1434,48 @@ void openNewConnection(Editor& ed, const std::string& src, const std::string& ds
     st = ConnectionDialog{};
     st.open = true;
     st.isNew = true;
-    st.draft = Connection{};
-    st.draft.sourceId = src;
-    st.draft.targetId = dst;
-    if (!ed.project.connectionTypes.empty()) st.draft.type = ed.project.connectionTypes.front();
+    if (ed.project.connectionTypes.empty()) return;
+    const ConnectionType& type = ed.project.connectionTypes.front();
+    st.draft.typeId = type.id;
+    st.draft.members.assign(type.roles.size(), std::string());
+    if (!src.empty() && !st.draft.members.empty()) st.draft.members[0] = src;
+    if (!dst.empty() && st.draft.members.size() > 1) st.draft.members[1] = dst;
+}
+
+void openNewConnectionOfType(Editor& ed, const std::string& typeId, size_t role,
+                             const std::string& elementId, bool withTime, long long time) {
+    const ConnectionType* type = ed.project.connectionType(typeId);
+    if (!type) return;
+    ConnectionDialog& st = ed.dialogs.connection;
+    st = ConnectionDialog{};
+    st.open = true;
+    st.isNew = true;
+    st.draft.typeId = typeId;
+    st.draft.members.assign(type->roles.size(), std::string());
+    if (role < st.draft.members.size()) st.draft.members[role] = elementId;
+    if (withTime) st.startText = formatStoryTime(time);
+}
+
+void openConnectionTypes(Editor& ed) { ed.dialogs.connectionTypes.open = true; }
+
+void openNewConnectionType(Editor& ed) {
+    ConnectionTypeDialog& st = ed.dialogs.connectionType;
+    st = ConnectionTypeDialog{};
+    st.open = true;
+    st.isNew = true;
+    st.draft = ConnectionType{};
+    st.draft.roles.push_back({"A", {}});
+    st.draft.roles.push_back({"B", {}});
+}
+
+void openEditConnectionType(Editor& ed, const std::string& typeId) {
+    const ConnectionType* t = ed.project.connectionType(typeId);
+    if (!t) return;
+    ConnectionTypeDialog& st = ed.dialogs.connectionType;
+    st = ConnectionTypeDialog{};
+    st.open = true;
+    st.isNew = false;
+    st.draft = *t;
 }
 
 void openEditConnection(Editor& ed, const std::string& connectionId) {
@@ -1135,6 +1486,8 @@ void openEditConnection(Editor& ed, const std::string& connectionId) {
     st.open = true;
     st.isNew = false;
     st.draft = *conn;
+    if (conn->hasStart) st.startText = formatStoryTime(conn->startTime);
+    if (conn->hasEnd) st.endText = formatStoryTime(conn->endTime);
 }
 
 void openNewBlock(Editor& ed, const std::vector<std::string>& connectionIds) {
@@ -1181,6 +1534,7 @@ void draw(Editor& ed) {
     drawTemplateDialog(ed);
     drawActionDialog(ed);
     drawConnectionDialog(ed);
+    if (!ed.dialogs.connection.open) drawConnectionTypeList(ed);
     drawBlockDialog(ed);
     drawMoveDialog(ed);
     drawConfirmDialog(ed);

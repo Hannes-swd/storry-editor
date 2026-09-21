@@ -10,6 +10,7 @@
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
 
+#include "core/StoryTime.h"
 #include "ui/Dialogs.h"
 #include "ui/Editor.h"
 #include "ui/Lang.h"
@@ -25,8 +26,10 @@ struct ConnState {
     float zoom = 1.0f;
     std::vector<std::string> selected;   // element ids
     std::string selectedConnection;
-    std::set<std::string> typeFilter;
+    std::set<std::string> typeFilter;   // Typ-IDs
     std::string focusId;
+    bool useTimeSlider = false;
+    long long sliderTime = 0;
     int focusDegree = 1;
     std::string dragNode;
     bool panning = false;
@@ -81,8 +84,12 @@ bool withinFocus(Editor& ed, const std::string& elementId, const ConnState& st) 
     for (int d = 0; d < st.focusDegree; ++d) {
         std::set<std::string> next;
         for (const Connection& conn : ed.project.connections) {
-            if (frontier.count(conn.sourceId)) next.insert(conn.targetId);
-            if (frontier.count(conn.targetId)) next.insert(conn.sourceId);
+            bool touches = false;
+            for (const std::string& m : conn.members) {
+                if (frontier.count(m)) touches = true;
+            }
+            if (!touches) continue;
+            for (const std::string& m : conn.members) next.insert(m);
         }
         for (const std::string& id : next) visited.insert(id);
         frontier = next;
@@ -129,9 +136,11 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
     if (ImGui::Button(TR("Block erstellen"))) {
         std::vector<std::string> connIds;
         for (const Connection& conn : ed.project.connections) {
-            bool a = std::find(st.selected.begin(), st.selected.end(), conn.sourceId) != st.selected.end();
-            bool b = std::find(st.selected.begin(), st.selected.end(), conn.targetId) != st.selected.end();
-            if (a && b) connIds.push_back(conn.id);
+            bool all = !conn.members.empty();
+            for (const std::string& m : conn.members) {
+                if (std::find(st.selected.begin(), st.selected.end(), m) == st.selected.end()) all = false;
+            }
+            if (all) connIds.push_back(conn.id);
         }
         dialogs::openNewBlock(ed, connIds);
     }
@@ -144,6 +153,8 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
         st.selectedConnection.clear();
     }
     ImGui::SameLine();
+    if (ImGui::Button(TR("Typen verwalten..."))) dialogs::openConnectionTypes(ed);
+    ImGui::SameLine();
     if (ImGui::Button(TR("Auto-Layout"))) {
         ed.pushUndo(TR("Auto-Layout"));
         ed.project.nodePositions.clear();
@@ -155,13 +166,13 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
     if (ImGui::Button(TR("Typ-Filter"))) ImGui::OpenPopup("conn_types");
     if (filterActive) ImGui::PopStyleColor();
     if (ImGui::BeginPopup("conn_types")) {
-        for (const std::string& t : ed.project.connectionTypes) {
-            bool on = st.typeFilter.count(t) > 0;
-            if (ImGui::Checkbox(t.c_str(), &on)) {
+        for (const ConnectionType& t : ed.project.connectionTypes) {
+            bool on = st.typeFilter.count(t.id) > 0;
+            if (ImGui::Checkbox((t.name + "##" + t.id).c_str(), &on)) {
                 if (on)
-                    st.typeFilter.insert(t);
+                    st.typeFilter.insert(t.id);
                 else
-                    st.typeFilter.erase(t);
+                    st.typeFilter.erase(t.id);
             }
         }
         if (ImGui::Button(TR("Alle"))) st.typeFilter.clear();
@@ -199,6 +210,26 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
         }
     }
 
+    bool anyTemporal = false;
+    for (const ConnectionType& t : ed.project.connectionTypes) {
+        if (t.temporal) anyTemporal = true;
+    }
+    if (anyTemporal) {
+        ImGui::SameLine();
+        ImGui::Checkbox(TR("Stand an Tag"), &st.useTimeSlider);
+        if (st.useTimeSlider) {
+            ImGui::SameLine();
+            long long maxTime = kMinutesPerDay * 30;
+            for (const Action& a : ed.project.actions)
+                maxTime = std::max(maxTime, ed.project.resolveActionTime(a));
+            int day = static_cast<int>(dayOf(st.sliderTime));
+            ImGui::SetNextItemWidth(220.0f);
+            if (ImGui::SliderInt("##slider", &day, 1, static_cast<int>(dayOf(maxTime)) + 1,
+                                 formatDayHeadline(st.sliderTime).c_str()))
+                st.sliderTime = static_cast<long long>(day - 1) * kMinutesPerDay;
+        }
+    }
+
     // -------------------------------------------------------------- canvas
     ImGui::BeginChild("graph", ImVec2(0, 0), ImGuiChildFlags_Borders,
                       ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove);
@@ -229,7 +260,7 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
         int count = 0;
         for (const Connection& conn : ed.project.connections) {
             if (conn.blockId != b.id) continue;
-            for (const std::string& id : {conn.sourceId, conn.targetId}) {
+            for (const std::string& id : conn.members) {
                 auto it = ed.project.nodePositions.find(id);
                 if (it == ed.project.nodePositions.end()) continue;
                 ImVec2 p = toScreen(it->second);
@@ -251,21 +282,53 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
     // ------------------------------------------------------------- edges
     std::string hoveredConnection;
     for (const Connection& conn : ed.project.connections) {
-        if (!st.typeFilter.empty() && st.typeFilter.count(conn.type) == 0) continue;
-        if (!withinFocus(ed, conn.sourceId, st) && !withinFocus(ed, conn.targetId, st)) continue;
+        if (!st.typeFilter.empty() && st.typeFilter.count(conn.typeId) == 0) continue;
+        if (st.useTimeSlider && !ed.project.connectionActiveAt(conn, st.sliderTime)) continue;
+        bool anyInFocus = false;
+        for (const std::string& m : conn.members) {
+            if (withinFocus(ed, m, st)) anyInFocus = true;
+        }
+        if (!anyInFocus) continue;
         const Block* blk = nullptr;
         for (const Block& b : ed.project.blocks) {
             if (b.id == conn.blockId) blk = &b;
         }
         if (blk && blk->collapsed) continue;
 
-        auto sit = ed.project.nodePositions.find(conn.sourceId);
-        auto tit = ed.project.nodePositions.find(conn.targetId);
-        if (sit == ed.project.nodePositions.end() || tit == ed.project.nodePositions.end()) continue;
-        ImVec2 a = toScreen(sit->second);
-        ImVec2 b = toScreen(tit->second);
+        const ConnectionType* ctype = ed.project.connectionType(conn.typeId);
+        const std::string typeName = ed.project.connectionTypeName(conn);
+        std::vector<ImVec2> points;
+        for (const std::string& m : conn.members) {
+            auto it = ed.project.nodePositions.find(m);
+            if (it != ed.project.nodePositions.end()) points.push_back(toScreen(it->second));
+        }
+        if (points.size() < 2) continue;
 
-        ImVec4 col = edgeColorFor(conn.type);
+        ImVec4 col = (ctype && ctype->colorExplicit) ? ctype->color : edgeColorFor(typeName);
+
+        // Mehr als zwei Rollen: Sternform mit Knotenpunkt in der Mitte
+        if (points.size() > 2) {
+            ImVec2 hub(0, 0);
+            for (const ImVec2& pt : points) {
+                hub.x += pt.x / static_cast<float>(points.size());
+                hub.y += pt.y / static_cast<float>(points.size());
+            }
+            for (const ImVec2& pt : points) dl->AddLine(hub, pt, theme::u32(col), 2.0f);
+            ImVec2 ts = ImGui::CalcTextSize(typeName.c_str());
+            dl->AddRectFilled(ImVec2(hub.x - ts.x * 0.5f - 5.0f, hub.y - ts.y * 0.5f - 3.0f),
+                              ImVec2(hub.x + ts.x * 0.5f + 5.0f, hub.y + ts.y * 0.5f + 3.0f),
+                              theme::u32(theme::withAlpha(c.backgroundColor, 0.9f)), 4.0f);
+            dl->AddRect(ImVec2(hub.x - ts.x * 0.5f - 5.0f, hub.y - ts.y * 0.5f - 3.0f),
+                        ImVec2(hub.x + ts.x * 0.5f + 5.0f, hub.y + ts.y * 0.5f + 3.0f),
+                        theme::u32(col), 4.0f);
+            dl->AddText(ImVec2(hub.x - ts.x * 0.5f, hub.y - ts.y * 0.5f), theme::u32(col),
+                        typeName.c_str());
+            if (hovered && distanceToSegment(mouse, hub, points[0]) < 6.0f) hoveredConnection = conn.id;
+            continue;
+        }
+
+        ImVec2 a = points[0];
+        ImVec2 b = points[1];
         bool selected = st.selectedConnection == conn.id;
         float dist = distanceToSegment(mouse, a, b);
         bool hot = hovered && dist < 6.0f;
@@ -285,11 +348,12 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
                                   theme::u32(col));
         }
         ImVec2 mid((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
-        ImVec2 ts = ImGui::CalcTextSize(conn.type.c_str());
+        ImVec2 ts = ImGui::CalcTextSize(typeName.c_str());
         dl->AddRectFilled(ImVec2(mid.x - ts.x * 0.5f - 3.0f, mid.y - ts.y * 0.5f - 1.0f),
                           ImVec2(mid.x + ts.x * 0.5f + 3.0f, mid.y + ts.y * 0.5f + 1.0f),
                           theme::u32(theme::withAlpha(c.backgroundColor, 0.85f)), 3.0f);
-        dl->AddText(ImVec2(mid.x - ts.x * 0.5f, mid.y - ts.y * 0.5f), theme::u32(col), conn.type.c_str());
+        dl->AddText(ImVec2(mid.x - ts.x * 0.5f, mid.y - ts.y * 0.5f), theme::u32(col),
+                    typeName.c_str());
     }
 
     // ------------------------------------------------------------- nodes
@@ -327,10 +391,16 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
             ImGui::TextUnformatted(el->name.c_str());
             ui::textSecondary(ed.project.elementPath(el->id).c_str());
             for (const Connection* conn : ed.project.connectionsForElement(el->id)) {
-                std::string other =
-                    conn->sourceId == el->id ? conn->targetId : conn->sourceId;
-                ImGui::BulletText("%s %s", conn->type.c_str(),
-                                  ed.project.displayName(other).c_str());
+                std::string others;
+                for (const std::string& m : conn->members) {
+                    if (m == el->id) continue;
+                    if (!others.empty()) others += ", ";
+                    others += ed.project.displayName(m);
+                }
+                std::string when;
+                if (conn->hasStart) when = " (" + formatStoryTime(conn->startTime) + ")";
+                ImGui::BulletText("%s %s%s", ed.project.connectionTypeName(*conn).c_str(),
+                                  others.c_str(), when.c_str());
             }
             ImGui::EndTooltip();
         }
@@ -385,7 +455,7 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
         if (!st.selectedConnection.empty()) {
             const Connection* conn = ed.project.connection(st.selectedConnection);
             if (conn) {
-                ImGui::TextDisabled("%s", conn->type.c_str());
+                ImGui::TextDisabled("%s", ed.project.connectionTypeName(*conn).c_str());
                 if (ImGui::MenuItem(TR("Verbindung bearbeiten")))
                     dialogs::openEditConnection(ed, st.selectedConnection);
                 if (ImGui::MenuItem(TR("Verbindung loeschen"))) {

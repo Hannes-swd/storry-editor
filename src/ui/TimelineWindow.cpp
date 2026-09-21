@@ -119,6 +119,7 @@ struct TimelineState {
     bool dragActive = false;
     bool initialised = false;
     float pendingScrollX = -1.0f;
+    std::set<std::string> hiddenBands;  // Typ-IDs, deren Band ausgeblendet ist
 };
 
 TimelineState& state() {
@@ -280,6 +281,32 @@ void drawFilterBar(Editor& ed, TimelineState& st) {
         ImGui::InputText("##to", &st.toText);
     }
 
+    // Baender: welche zeitlichen Verbindungstypen hinterlegt werden
+    bool anyTemporal = false;
+    for (const ConnectionType& t : ed.project.connectionTypes) {
+        if (t.temporal) anyTemporal = true;
+    }
+    if (anyTemporal) {
+        ImGui::SameLine();
+        if (ImGui::Button(TR("Baender"))) ImGui::OpenPopup("tl_bands");
+        if (ImGui::BeginPopup("tl_bands")) {
+            ImGui::TextUnformatted(TR("Verbindungen als Band zeigen"));
+            ImGui::Separator();
+            for (const ConnectionType& t : ed.project.connectionTypes) {
+                if (!t.temporal) continue;
+                bool on = st.hiddenBands.count(t.id) == 0;
+                if (ImGui::Checkbox((t.name + "##band" + t.id).c_str(), &on)) {
+                    if (on)
+                        st.hiddenBands.erase(t.id);
+                    else
+                        st.hiddenBands.insert(t.id);
+                }
+            }
+            if (ImGui::SmallButton(TR("Typen verwalten..."))) dialogs::openConnectionTypes(ed);
+            ImGui::EndPopup();
+        }
+    }
+
     ImGui::SameLine();
     if (ImGui::Button(TR("Filter zuruecksetzen"))) {
         st.groupFilter.clear();
@@ -414,6 +441,54 @@ void drawTimelineWindow(Editor& ed, bool* open) {
             }
             dl->AddLine(ImVec2(mid - 4.0f, origin.y + rulerH), ImVec2(mid + 4.0f, origin.y + totalH),
                         theme::u32(c.timelineGrid, 0.8f), 1.0f);
+        }
+    }
+
+    // --------------------------------------------------------------- bands
+    // Zeitliche Verbindungen als farbiger Balken hinter der Spur.
+    for (size_t i = 0; i < rows.size(); ++i) {
+        const TrackRow& row = rows[i];
+        if (row.isGroup) continue;
+        float y0 = rowTop(static_cast<int>(i)) + 2.0f;
+        float y1 = y0 + trackH - 4.0f;
+
+        for (const ConnectionType& type : ed.project.connectionTypes) {
+            if (!type.temporal || !type.showBand) continue;
+            if (st.hiddenBands.count(type.id)) continue;
+            std::vector<Project::BandSegment> segments = ed.project.bandSegments(row.id, type.id);
+            for (const Project::BandSegment& seg : segments) {
+                float x0 = xOf(seg.start);
+                float x1 = seg.hasEnd ? xOf(seg.end) : origin.x + totalW;
+                if (x1 < winPos.x + headerW || x0 > winPos.x + winSize.x) continue;
+                x0 = std::max(x0, winPos.x + headerW);
+                x1 = std::min(x1, origin.x + totalW);
+
+                ImVec4 col = seg.labelElementId.empty()
+                                 ? c.edgeColor
+                                 : ed.project.elementColor(seg.labelElementId);
+                dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1),
+                                  theme::u32(theme::withAlpha(col, 0.22f)), 3.0f);
+                dl->AddRect(ImVec2(x0, y0), ImVec2(x1, y1), theme::u32(theme::withAlpha(col, 0.65f)),
+                            3.0f);
+
+                std::string label = ed.project.displayName(seg.labelElementId);
+                ImVec2 ts = ImGui::CalcTextSize(label.c_str());
+                if (x1 - x0 > ts.x + 14.0f) {
+                    // kleiner Hintergrund, damit die Beschriftung neben den
+                    // Ereignis-Punkten lesbar bleibt
+                    ImVec2 tp(x0 + 6.0f, y0 + (y1 - y0 - ts.y) * 0.5f);
+                    dl->AddRectFilled(ImVec2(tp.x - 3.0f, tp.y - 1.0f),
+                                      ImVec2(tp.x + ts.x + 3.0f, tp.y + ts.y + 1.0f),
+                                      theme::u32(theme::withAlpha(c.timelineBackground, 0.85f)), 2.0f);
+                    dl->AddText(tp, theme::u32(c.textPrimary), label.c_str());
+                }
+                // Klick auf das Band waehlt die Verbindung aus
+                if (canvasHovered && mouse.x >= x0 && mouse.x <= x1 && mouse.y >= y0 &&
+                    mouse.y <= y1 && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    ed.select(SelKind::Connection, seg.connectionId);
+                    theme::settings().showDetails = true;
+                }
+            }
         }
     }
 
@@ -701,6 +776,18 @@ void drawTimelineWindow(Editor& ed, bool* open) {
             if (st.dragRow >= 0 && st.dragRow < static_cast<int>(rows.size()) && !rows[st.dragRow].isGroup)
                 elementId = rows[st.dragRow].id;
             if (ImGui::MenuItem(TR("Neue Aktion hier"))) dialogs::openNewAction(ed, st.dragTime, elementId);
+            if (!elementId.empty()) {
+                // Zeitliche Verbindungen, in deren Band-Rolle dieses Element passt
+                for (const ConnectionType& type : ed.project.connectionTypes) {
+                    if (!type.temporal) continue;
+                    const size_t role = static_cast<size_t>(type.bandRole < 0 ? 0 : type.bandRole);
+                    if (!ed.project.roleAccepts(type, role, elementId)) continue;
+                    std::string label = std::string(TR("Setzen: ")) + type.name;
+                    if (ImGui::MenuItem(label.c_str()))
+                        dialogs::openNewConnectionOfType(ed, type.id, role, elementId, true,
+                                                         st.dragTime);
+                }
+            }
             ImGui::TextDisabled("%s", formatStoryTimeLong(st.dragTime).c_str());
         }
         ImGui::EndPopup();

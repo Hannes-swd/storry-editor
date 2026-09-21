@@ -294,9 +294,14 @@ void drawElementDetails(Editor& ed, Element& el) {
         std::vector<const Connection*> conns = ed.project.connectionsForElement(el.id);
         if (conns.empty()) ui::textSecondary(TR("Keine Verbindungen."));
         for (const Connection* conn : conns) {
-            std::string other = conn->sourceId == el.id ? conn->targetId : conn->sourceId;
-            ImGui::TextUnformatted(conn->type.c_str());
-            ui::elementChip(ed, other);
+            ImGui::TextUnformatted(ed.project.connectionTypeName(*conn).c_str());
+            if (conn->hasStart) {
+                ImGui::SameLine();
+                ui::textSecondary(formatStoryTime(conn->startTime).c_str());
+            }
+            for (const std::string& m : conn->members) {
+                if (m != el.id) ui::elementChip(ed, m);
+            }
             ImGui::SameLine();
             ImGui::PushID(conn->id.c_str());
             if (ImGui::SmallButton(TR("Bearbeiten"))) dialogs::openEditConnection(ed, conn->id);
@@ -418,17 +423,19 @@ void drawGroupDetails(Editor& ed, Group& g) {
 
 void drawConnectionDetails(Editor& ed, Connection& conn) {
     ImGui::PushFont(nullptr, ImGui::GetFontSize() * 1.25f);
-    ImGui::TextUnformatted(conn.type.c_str());
+    ImGui::TextUnformatted(ed.project.connectionTypeName(conn).c_str());
     ImGui::PopFont();
     ImGui::Separator();
-    ui::elementChip(ed, conn.sourceId, false);
-    ImGui::SameLine();
-    ImGui::TextUnformatted("->");
-    ui::elementChip(ed, conn.targetId);
-    ImGui::NewLine();
+    if (const ConnectionType* type = ed.project.connectionType(conn.typeId)) {
+        for (size_t i = 0; i < conn.members.size(); ++i) {
+            ui::textSecondary(i < type->roles.size() ? type->roles[i].name.c_str() : "?");
+            ui::elementChip(ed, conn.members[i]);
+            ImGui::NewLine();
+        }
+    }
     ImGui::TextWrapped("%s", conn.description.c_str());
-    if (!conn.startDate.empty()) ui::textSecondary((TR("Von: ") + conn.startDate).c_str());
-    if (!conn.endDate.empty()) ui::textSecondary((TR("Bis: ") + conn.endDate).c_str());
+    if (conn.hasStart) ui::textSecondary((TR("Von: ") + formatStoryTime(conn.startTime)).c_str());
+    if (conn.hasEnd) ui::textSecondary((TR("Bis: ") + formatStoryTime(conn.endTime)).c_str());
     if (ImGui::Button(TR("Bearbeiten"))) dialogs::openEditConnection(ed, conn.id);
 }
 

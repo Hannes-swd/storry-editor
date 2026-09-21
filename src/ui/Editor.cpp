@@ -410,16 +410,10 @@ void Editor::drawWindows() {
 // -------------------------------------------------------- settings window
 namespace {
 
-enum class ListKind { ActionType, ConnectionType, Storyline };
+enum class ListKind { ActionType, Storyline };
 
 int countUsage(Editor& ed, ListKind kind, const std::string& value) {
     int count = 0;
-    if (kind == ListKind::ConnectionType) {
-        for (const Connection& c : ed.project.connections) {
-            if (c.type == value) ++count;
-        }
-        return count;
-    }
     for (const Action& a : ed.project.actions) {
         if (kind == ListKind::ActionType ? a.type == value : a.storyline == value) ++count;
     }
@@ -427,13 +421,6 @@ int countUsage(Editor& ed, ListKind kind, const std::string& value) {
 }
 
 void replaceUsage(Editor& ed, ListKind kind, const std::string& from, const std::string& to) {
-    if (kind == ListKind::ConnectionType) {
-        for (Connection& c : ed.project.connections) {
-            if (c.type == from) c.type = to;
-        }
-        ed.markConnections();
-        return;
-    }
     for (Action& a : ed.project.actions) {
         if (kind == ListKind::ActionType && a.type == from) a.type = to;
         if (kind == ListKind::Storyline && a.storyline == from) a.storyline = to;
@@ -651,7 +638,9 @@ void drawSettingsWindow(Editor& ed, bool* open) {
              TR("im jeweiligen Dropdown anlegen."))
                 .c_str());
         drawListEditor(ed, TR("Aktions-Typen"), ed.project.actionTypes, ListKind::ActionType);
-        drawListEditor(ed, TR("Beziehungstypen"), ed.project.connectionTypes, ListKind::ConnectionType);
+        if (ImGui::Button(TR("Verbindungstypen verwalten..."))) dialogs::openConnectionTypes(ed);
+        ui::helpMarker(TR("Verbindungstypen sind eigene Vorlagen mit Rollen - sie werden im eigenen "
+                          "Fenster verwaltet."));
         drawListEditor(ed, TR("Handlungsstraenge"), ed.project.storylines, ListKind::Storyline);
     }
 

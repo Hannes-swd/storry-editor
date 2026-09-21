@@ -186,27 +186,104 @@ Action actionFromJson(const json& j) {
     return a;
 }
 
+json connectionTypeToJson(const ConnectionType& t) {
+    json roles = json::array();
+    for (const ConnectionRole& r : t.roles) {
+        roles.push_back({{"name", r.name}, {"groups", r.allowedGroups}});
+    }
+    return json{{"id", t.id},
+                {"name", t.name},
+                {"description", t.description},
+                {"roles", roles},
+                {"temporal", t.temporal},
+                {"exclusive", t.exclusive},
+                {"band_role", t.bandRole},
+                {"label_role", t.labelRole},
+                {"show_band", t.showBand},
+                {"color", colorToJson(t.color)},
+                {"color_explicit", t.colorExplicit}};
+}
+
+ConnectionType connectionTypeFromJson(const json& j) {
+    ConnectionType t;
+    t.id = j.value("id", newId("ctype"));
+    t.name = j.value("name", "Verbindung");
+    t.description = j.value("description", "");
+    if (j.contains("roles") && j["roles"].is_array()) {
+        for (auto& r : j["roles"]) {
+            ConnectionRole role;
+            role.name = r.value("name", "Rolle");
+            if (r.contains("groups")) {
+                for (auto& g : r["groups"]) role.allowedGroups.push_back(g.get<std::string>());
+            }
+            t.roles.push_back(role);
+        }
+    }
+    if (t.roles.size() < 2) {
+        while (t.roles.size() < 2) t.roles.push_back({t.roles.empty() ? "A" : "B", {}});
+    }
+    t.temporal = j.value("temporal", false);
+    t.exclusive = j.value("exclusive", true);
+    t.bandRole = j.value("band_role", 0);
+    t.labelRole = j.value("label_role", 1);
+    t.showBand = j.value("show_band", true);
+    t.color = colorFromJson(j.value("color", json()), ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    t.colorExplicit = j.value("color_explicit", false);
+    return t;
+}
+
 json connectionToJson(const Connection& c) {
     return json{{"id", c.id},
-                {"source", c.sourceId},
-                {"target", c.targetId},
-                {"type", c.type},
+                {"type_id", c.typeId},
+                {"members", c.members},
                 {"description", c.description},
-                {"start_date", c.startDate},
-                {"end_date", c.endDate},
+                {"has_start", c.hasStart},
+                {"start", c.startTime},
+                {"has_end", c.hasEnd},
+                {"end", c.endTime},
+                {"start_text", c.hasStart ? formatStoryTime(c.startTime) : std::string()},
+                {"end_text", c.hasEnd ? formatStoryTime(c.endTime) : std::string()},
                 {"block", c.blockId}};
 }
 
-Connection connectionFromJson(const json& j) {
+// Nimmt auch das alte Format (source/target/type als Text) entgegen; der Typ
+// wird dann spaeter anhand des Namens erzeugt.
+Connection connectionFromJson(const json& j, std::string* legacyTypeName) {
     Connection c;
     c.id = j.value("id", newId("conn"));
-    c.sourceId = j.value("source", "");
-    c.targetId = j.value("target", "");
-    c.type = j.value("type", "related_to");
+    c.typeId = j.value("type_id", "");
     c.description = j.value("description", "");
-    c.startDate = j.value("start_date", "");
-    c.endDate = j.value("end_date", "");
     c.blockId = j.value("block", "");
+    if (j.contains("members") && j["members"].is_array()) {
+        for (auto& m : j["members"]) c.members.push_back(m.get<std::string>());
+    }
+    if (c.members.empty()) {
+        const std::string src = j.value("source", "");
+        const std::string dst = j.value("target", "");
+        if (!src.empty()) c.members.push_back(src);
+        if (!dst.empty()) c.members.push_back(dst);
+    }
+    c.hasStart = j.value("has_start", false);
+    c.startTime = j.value("start", 0LL);
+    c.hasEnd = j.value("has_end", false);
+    c.endTime = j.value("end", 0LL);
+    if (!c.hasStart) {
+        const std::string text = j.value("start_date", "");
+        long long parsed = 0;
+        if (!text.empty() && parseStoryTime(text, &parsed)) {
+            c.hasStart = true;
+            c.startTime = parsed;
+        }
+    }
+    if (!c.hasEnd) {
+        const std::string text = j.value("end_date", "");
+        long long parsed = 0;
+        if (!text.empty() && parseStoryTime(text, &parsed)) {
+            c.hasEnd = true;
+            c.endTime = parsed;
+        }
+    }
+    if (legacyTypeName && c.typeId.empty()) *legacyTypeName = j.value("type", "related_to");
     return c;
 }
 
@@ -291,9 +368,15 @@ std::string elementMarkdown(const Project& p, const Element& el) {
     if (!conns.empty()) {
         os << "\n## " << sectionRelations() << "\n";
         for (const Connection* c : conns) {
-            const std::string other = c->sourceId == el.id ? c->targetId : c->sourceId;
-            const char* dir = c->sourceId == el.id ? "->" : "<-";
-            os << "- " << c->type << " " << dir << " [[" << p.displayName(other) << "]]\n";
+            os << "- " << p.connectionTypeName(*c);
+            for (const std::string& m : c->members) {
+                if (m == el.id) continue;
+                os << " -> [[" << p.displayName(m) << "]]";
+            }
+            if (c->hasStart) os << "  (" << formatStoryTime(c->startTime);
+            if (c->hasStart && c->hasEnd) os << " - " << formatStoryTime(c->endTime);
+            if (c->hasStart) os << ")";
+            os << "\n";
         }
     }
 
@@ -388,7 +471,9 @@ bool saveMetadata(const Project& p, std::string* err) {
     j["groups"] = json::array();
     for (const Group& g : p.groups) j["groups"].push_back(groupToJson(g));
     j["action_types"] = p.actionTypes;
-    j["connection_types"] = p.connectionTypes;
+    j["connection_types"] = json::array();
+    for (const ConnectionType& t : p.connectionTypes)
+        j["connection_types"].push_back(connectionTypeToJson(t));
     j["storylines"] = p.storylines;
     j["node_positions"] = json::object();
     for (const auto& kv : p.nodePositions) {
@@ -533,7 +618,12 @@ bool load(const std::string& path, Project& p, std::string* err) {
     }
     if (meta.contains("connection_types") && meta["connection_types"].is_array()) {
         p.connectionTypes.clear();
-        for (auto& t : meta["connection_types"]) p.connectionTypes.push_back(t.get<std::string>());
+        for (auto& t : meta["connection_types"]) {
+            if (t.is_string())
+                p.ensureConnectionType(t.get<std::string>());  // altes Format: nur Namen
+            else
+                p.connectionTypes.push_back(connectionTypeFromJson(t));
+        }
     }
     if (meta.contains("storylines") && meta["storylines"].is_array()) {
         p.storylines.clear();
@@ -607,7 +697,17 @@ bool load(const std::string& path, Project& p, std::string* err) {
         try {
             json j = json::parse(connText);
             if (j.contains("connections")) {
-                for (auto& c : j["connections"]) p.connections.push_back(connectionFromJson(c));
+                for (auto& c : j["connections"]) {
+                    std::string legacyType;
+                    Connection conn = connectionFromJson(c, &legacyType);
+                    if (conn.typeId.empty()) {
+                        // Altbestand: Typ anhand des Namens anlegen bzw. finden
+                        ConnectionType& t = p.ensureConnectionType(
+                            legacyType.empty() ? std::string("related_to") : legacyType);
+                        conn.typeId = t.id;
+                    }
+                    p.connections.push_back(conn);
+                }
             }
             if (j.contains("blocks")) {
                 for (auto& b : j["blocks"]) {
@@ -634,7 +734,9 @@ bool load(const std::string& path, Project& p, std::string* err) {
         mergeInto(p.actionTypes, a.type);
         mergeInto(p.storylines, a.storyline);
     }
-    for (const Connection& c : p.connections) mergeInto(p.connectionTypes, c.type);
+    for (Connection& c : p.connections) {
+        if (!p.connectionType(c.typeId)) c.typeId = p.ensureConnectionType("related_to").id;
+    }
 
     p.loaded = true;
     return true;
@@ -651,6 +753,9 @@ json snapshot(const Project& p) {
     for (const Action& a : p.actions) j["actions"].push_back(actionToJson(a));
     j["connections"] = json::array();
     for (const Connection& c : p.connections) j["connections"].push_back(connectionToJson(c));
+    j["connection_type_defs"] = json::array();
+    for (const ConnectionType& t : p.connectionTypes)
+        j["connection_type_defs"].push_back(connectionTypeToJson(t));
     j["blocks"] = json::array();
     for (const Block& b : p.blocks) {
         j["blocks"].push_back(
@@ -660,7 +765,6 @@ json snapshot(const Project& p) {
     for (const auto& kv : p.nodePositions)
         j["node_positions"][kv.first] = json::array({kv.second.x, kv.second.y});
     j["action_types"] = p.actionTypes;
-    j["connection_types"] = p.connectionTypes;
     j["storylines"] = p.storylines;
     return j;
 }
@@ -671,12 +775,22 @@ void restore(const json& j, Project& p) {
     p.elements.clear();
     p.actions.clear();
     p.connections.clear();
+    p.connectionTypes.clear();
     p.blocks.clear();
     p.nodePositions.clear();
     for (auto& g : j["groups"]) p.groups.push_back(groupFromJson(g));
     for (auto& e : j["elements"]) p.elements.push_back(elementFromJson(e));
     for (auto& a : j["actions"]) p.actions.push_back(actionFromJson(a));
-    for (auto& c : j["connections"]) p.connections.push_back(connectionFromJson(c));
+    if (j.contains("connection_type_defs")) {
+        for (auto& t : j["connection_type_defs"])
+            p.connectionTypes.push_back(connectionTypeFromJson(t));
+    }
+    for (auto& c : j["connections"]) {
+        std::string legacyType;
+        Connection conn = connectionFromJson(c, &legacyType);
+        if (conn.typeId.empty()) conn.typeId = p.ensureConnectionType(legacyType).id;
+        p.connections.push_back(conn);
+    }
     for (auto& b : j["blocks"]) {
         Block blk;
         blk.id = b.value("id", newId("blk"));
@@ -695,10 +809,7 @@ void restore(const json& j, Project& p) {
         p.actionTypes.clear();
         for (auto& t : j["action_types"]) p.actionTypes.push_back(t.get<std::string>());
     }
-    if (j.contains("connection_types")) {
-        p.connectionTypes.clear();
-        for (auto& t : j["connection_types"]) p.connectionTypes.push_back(t.get<std::string>());
-    }
+
     if (j.contains("storylines")) {
         p.storylines.clear();
         for (auto& t : j["storylines"]) p.storylines.push_back(t.get<std::string>());

@@ -158,8 +158,26 @@ void testVaultRoundTrip(Report& r) {
     a.tags.push_back("Discovery");
     a.mutations.push_back({alice.id, "age", "27", "28"});
 
-    Connection& conn = p.addConnection(alice.id, sword.id, "owns");
+    ConnectionType& owns = p.ensureConnectionType("owns");
+    Connection& conn = p.addConnection(owns.id, {alice.id, sword.id});
     conn.description = "Alice besitzt das Schwert.";
+
+    // zeitlicher, exklusiver Typ: "ist an Ort"
+    ConnectionType& atPlace = p.addConnectionType("ist an Ort");
+    atPlace.temporal = true;
+    atPlace.exclusive = true;
+    atPlace.roles[0].name = "Wer";
+    atPlace.roles[1].name = "Wo";
+    Group* locations = p.findGroupByPath("Locations");
+    Element& castle = p.addElement("Castle", locations->id);
+    Element& forest = p.addElement("Forest", locations->id);
+    Connection& first = p.addConnection(atPlace.id, {alice.id, forest.id});
+    first.hasStart = true;
+    first.startTime = 1 * kMinutesPerDay;
+    Connection& second = p.addConnection(atPlace.id, {alice.id, castle.id});
+    second.hasStart = true;
+    second.startTime = 5 * kMinutesPerDay;
+    p.applyExclusivity(second);
 
     r.check(vault::saveAll(p, &err), "saveAll: " + err);
     r.check(fs::exists(platform::fsPath(vaultPath + "/Characters/Main/Alice.md")), "Alice.md written");
@@ -173,8 +191,9 @@ void testVaultRoundTrip(Report& r) {
     r.check(loaded.name == "Testprojekt", "project name restored");
     r.check(loaded.groups.size() == p.groups.size(), "groups restored");
     r.check(loaded.elements.size() == p.elements.size(), "elements restored");
+    r.check(loaded.connectionTypes.size() == p.connectionTypes.size(), "connection types restored");
     r.check(loaded.actions.size() == 1, "actions restored");
-    r.check(loaded.connections.size() == 1, "connections restored");
+    r.check(loaded.connections.size() == p.connections.size(), "connections restored");
 
     const Element* aliceLoaded = loaded.findElementByPath("Characters/Main/Alice");
     r.check(aliceLoaded != nullptr, "Alice found by path after load");
@@ -199,6 +218,35 @@ void testVaultRoundTrip(Report& r) {
                 "per element field stays on that element");
     }
 
+    // zeitliche Verbindungen
+    {
+        const ConnectionType* type = loaded.connectionTypeByName("ist an Ort");
+        r.check(type != nullptr, "temporal connection type restored");
+        if (type) {
+            r.check(type->temporal && type->exclusive, "temporal flags restored");
+            const Element* al = loaded.findElementByPath("Characters/Main/Alice");
+            std::vector<Project::BandSegment> segs =
+                al ? loaded.bandSegments(al->id, type->id) : std::vector<Project::BandSegment>();
+            r.check(segs.size() == 2, "two band segments for Alice");
+            if (segs.size() == 2) {
+                r.check(segs[0].hasEnd && segs[0].end == segs[1].start,
+                        "exclusive segment ends where the next starts");
+                r.check(!segs[1].hasEnd, "last segment stays open");
+                r.check(loaded.displayName(segs[1].labelElementId) == "Castle",
+                        "band label is the other role");
+            }
+            const Connection* atForest = nullptr;
+            for (const Connection& c : loaded.connections) {
+                if (c.typeId == type->id && loaded.displayName(c.members[1]) == "Forest")
+                    atForest = &c;
+            }
+            r.check(atForest && !loaded.connectionActiveAt(*atForest, 6 * kMinutesPerDay),
+                    "ended connection is inactive later");
+            r.check(atForest && loaded.connectionActiveAt(*atForest, 2 * kMinutesPerDay),
+                    "connection active inside its range");
+        }
+    }
+
     // undo snapshot round trip
     nlohmann::json snap = vault::snapshot(loaded);
     size_t before = loaded.actions.size();
@@ -217,6 +265,54 @@ void testVaultRoundTrip(Report& r) {
                 "old file removed");
     }
 
+    fs::remove_all(tmp, ec);
+}
+
+
+// Ein Projekt aus der Zeit vor den Verbindungstypen muss weiter laden.
+void testLegacyConnections(Report& r) {
+    std::error_code ec;
+    fs::path tmp = fs::temp_directory_path(ec) / "story_editor_legacy";
+    fs::remove_all(tmp, ec);
+    std::string vaultPath = platform::pathToUtf8(tmp);
+
+    Project p;
+    std::string err;
+    if (!vault::createVault(vaultPath, "Alt", p, &err)) {
+        r.check(false, "legacy: createVault");
+        return;
+    }
+    Group* main = p.findGroupByPath("Characters/Main");
+    Group* objects = p.findGroupByPath("Objects");
+    Element& alice = p.addElement("Alice", main->id);
+    Element& sword = p.addElement("Sword", objects->id);
+    const std::string aliceId = alice.id;
+    const std::string swordId = sword.id;
+    vault::saveAll(p, &err);
+
+    // altes Format von Hand schreiben: source/target/type als Text
+    std::string legacy =
+        "{\n  \"connections\": [\n    {\n      \"id\": \"conn_old\",\n"
+        "      \"source\": \"" + aliceId + "\",\n"
+        "      \"target\": \"" + swordId + "\",\n"
+        "      \"type\": \"owns\",\n"
+        "      \"description\": \"alt\",\n"
+        "      \"start_date\": \"Tag 5\",\n"
+        "      \"end_date\": \"\"\n    }\n  ],\n  \"blocks\": []\n}\n";
+    platform::writeFile(vaultPath + "/Connections/relationships.json", legacy, &err);
+
+    Project loaded;
+    r.check(vault::load(vaultPath, loaded, &err), "legacy: load: " + err);
+    r.check(loaded.connections.size() == 1, "legacy: connection kept");
+    if (!loaded.connections.empty()) {
+        const Connection& c = loaded.connections.front();
+        r.check(!c.typeId.empty(), "legacy: type created from the name");
+        r.check(loaded.connectionTypeName(c) == "owns", "legacy: type name kept");
+        r.check(c.members.size() == 2 && c.members[0] == aliceId && c.members[1] == swordId,
+                "legacy: source/target became roles");
+        r.check(c.hasStart && c.startTime == 4 * kMinutesPerDay, "legacy: start_date parsed");
+        r.check(!c.hasEnd, "legacy: empty end stays open");
+    }
     fs::remove_all(tmp, ec);
 }
 
@@ -293,9 +389,30 @@ int createDemoProject(const std::string& vaultPath) {
                                     "Feuer faellt auf die Burg, die Wachen fliehen.", true);
     if (Action* a = p.action(attack)) a->mutations.push_back({bob, "status", "Alive", "Injured"});
 
-    p.addConnection(alice, bob, "married_to").description = "Alice und Bob sind verheiratet.";
-    p.addConnection(alice, sword, "owns").description = "Seit Tag 5.";
-    p.addConnection(guard, castle, "guards").description = "Wache am Haupttor.";
+    p.addConnection(p.ensureConnectionType("married_to").id, {alice, bob}).description =
+        "Alice und Bob sind verheiratet.";
+    p.addConnection(p.ensureConnectionType("owns").id, {alice, sword}).description = "Seit Tag 5.";
+    p.addConnection(p.ensureConnectionType("guards").id, {guard, castle}).description =
+        "Wache am Haupttor.";
+
+    // Beispiel fuer eine zeitliche Verbindung mit Band in der Timeline
+    ConnectionType& atPlace = p.addConnectionType("ist an Ort");
+    atPlace.temporal = true;
+    atPlace.exclusive = true;
+    atPlace.roles[0].name = "Wer";
+    atPlace.roles[0].allowedGroups.push_back(p.findGroupByPath("Characters")->id);
+    atPlace.roles[1].name = "Wo";
+    atPlace.roles[1].allowedGroups.push_back(p.findGroupByPath("Locations")->id);
+    auto place = [&](const std::string& who, const std::string& where, long long day) {
+        Connection& c = p.addConnection(atPlace.id, {who, where});
+        c.hasStart = true;
+        c.startTime = day * kMinutesPerDay;
+        p.applyExclusivity(c);
+    };
+    place(alice, castle, 0);
+    place(alice, forest, 4);
+    place(alice, castle, 10);
+    place(bob, castle, 0);
 
     return vault::saveAll(p, &err) ? 0 : 1;
 }
@@ -308,6 +425,7 @@ int runSelfTest(const std::string& reportPath) {
     testMutations(r);
     testMarkdownRoundTrip(r);
     testVaultRoundTrip(r);
+    testLegacyConnections(r);
     r.os << "---------------------\n"
          << r.passed << " ok, " << r.failed << " fehlgeschlagen\n";
 

@@ -92,15 +92,46 @@ struct Action {
 };
 
 // ----------------------------------------------------------------- connection
+// Eine Rolle ist ein Platz in einer Verbindung: "Person", "Ort", "Besitzer".
+// Welche Gruppen dort eingesetzt werden duerfen, bestimmt der Benutzer.
+// A role is one slot of a connection; the user decides which groups may fill it.
+struct ConnectionRole {
+    std::string name;
+    std::vector<std::string> allowedGroups;  // Gruppen-IDs, leer = alle erlaubt
+};
+
+// Vorlage fuer Verbindungen - das Gegenstueck zum Gruppen-Template.
+struct ConnectionType {
+    std::string id;
+    std::string name = "Verbindung";
+    std::string description;
+    std::vector<ConnectionRole> roles;  // mindestens zwei
+    bool temporal = false;   // ueber die Timeline setzbar und zeitlich begrenzt
+    bool exclusive = true;   // pro Element nur eine gleichzeitig (nur bei temporal)
+    int bandRole = 0;        // in wessen Spur das Band laeuft
+    int labelRole = 1;       // womit das Band beschriftet wird
+    bool showBand = true;    // Band in der Timeline zeichnen
+    ImVec4 color = ImVec4(0, 0, 0, 0);
+    bool colorExplicit = false;
+};
+
 struct Connection {
     std::string id;
-    std::string sourceId;
-    std::string targetId;
-    std::string type = "related_to";
+    std::string typeId;                  // Verweis auf den ConnectionType
+    std::vector<std::string> members;    // ein Element je Rolle
     std::string description;
-    std::string startDate;
-    std::string endDate;
+    // Zeitraum, nur bei zeitlichen Typen benutzt. "bis" offen = gilt weiter.
+    bool hasStart = false;
+    long long startTime = 0;
+    bool hasEnd = false;
+    long long endTime = 0;
     std::string blockId;  // optional block membership
+
+    // Bequemlichkeit fuer den Graph und aeltere Projekte
+    const std::string& source() const { return members.size() > 0 ? members[0] : empty(); }
+    const std::string& target() const { return members.size() > 1 ? members[1] : empty(); }
+    bool has(const std::string& elementId) const;
+    static const std::string& empty();
 };
 
 struct Block {
