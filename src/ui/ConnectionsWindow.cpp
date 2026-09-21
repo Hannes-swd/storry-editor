@@ -202,24 +202,10 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
     for (const ConnectionType& t : ed.project.connectionTypes) {
         if (t.temporal) anyTemporal = true;
     }
-    if (anyTemporal) {
-        ImGui::SameLine();
-        ImGui::Checkbox(TR("Stand an Tag"), &st.useTimeSlider);
-        if (st.useTimeSlider) {
-            ImGui::SameLine();
-            long long maxTime = kMinutesPerDay * 30;
-            for (const Action& a : ed.project.actions)
-                maxTime = std::max(maxTime, ed.project.resolveActionTime(a));
-            int day = static_cast<int>(dayOf(st.sliderTime));
-            ImGui::SetNextItemWidth(220.0f);
-            if (ImGui::SliderInt("##slider", &day, 1, static_cast<int>(dayOf(maxTime)) + 1,
-                                 formatDayHeadline(st.sliderTime).c_str()))
-                st.sliderTime = static_cast<long long>(day - 1) * kMinutesPerDay;
-        }
-    }
 
     // -------------------------------------------------------------- canvas
-    ImGui::BeginChild("graph", ImVec2(0, 0), ImGuiChildFlags_Borders,
+    const float barHeight = anyTemporal ? (st.useTimeSlider ? 92.0f : 34.0f) : 0.0f;
+    ImGui::BeginChild("graph", ImVec2(0, -barHeight), ImGuiChildFlags_Borders,
                       ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove);
     ImVec2 canvasPos = ImGui::GetWindowPos();
     ImVec2 canvasSize = ImGui::GetWindowSize();
@@ -509,6 +495,55 @@ void drawConnectionsWindow(Editor& ed, bool* open) {
                     TR("Linksklick = waehlen (Strg = mehrere), ziehen = verschieben, Rad = Zoom"));
 
     ImGui::EndChild();
+
+    // ------------------------------------------------------- Zeitleiste
+    // Zugeklappt gelten alle Verbindungen, aufgeklappt nur die, die zum
+    // gewaehlten Zeitpunkt tatsaechlich gelten.
+    if (anyTemporal) {
+        // Die Beschriftung darf nicht vom Zustand der Vorframe abhaengen, sonst
+        // haengt sie beim Auf- und Zuklappen einen Frame hinterher.
+        const bool barOpen = ImGui::CollapsingHeader(TR("Zeitleiste"));
+        st.useTimeSlider = barOpen;
+        if (barOpen) {
+            ui::textSecondary(TR("Es werden nur Verbindungen gezeigt, die an diesem Tag gelten."));
+            long long maxTime = 7 * kMinutesPerDay;
+            for (const Action& a : ed.project.actions)
+                maxTime = std::max(maxTime, ed.project.resolveActionTime(a));
+            for (const Connection& conn : ed.project.connections) {
+                if (conn.hasStart) maxTime = std::max(maxTime, conn.startTime);
+                if (conn.hasEnd) maxTime = std::max(maxTime, conn.endTime);
+            }
+            const int lastDay = static_cast<int>(dayOf(maxTime)) + 1;
+            int day = static_cast<int>(dayOf(st.sliderTime));
+
+            if (ImGui::Button("|<")) day = 1;
+            ui::tooltip(TR("Zum Anfang"));
+            ImGui::SameLine();
+            if (ImGui::Button("<") && day > 1) --day;
+            ImGui::SameLine();
+            if (ImGui::Button(">") && day < lastDay) ++day;
+            ImGui::SameLine();
+            if (ImGui::Button(">|")) day = lastDay;
+            ui::tooltip(TR("Zum Ende"));
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(-160.0f);
+            ImGui::SliderInt("##timeline", &day, 1, lastDay,
+                             formatDayHeadline(static_cast<long long>(day - 1) * kMinutesPerDay)
+                                 .c_str());
+            st.sliderTime = static_cast<long long>(day - 1) * kMinutesPerDay;
+
+            ImGui::SameLine();
+            int active = 0;
+            for (const Connection& conn : ed.project.connections) {
+                if (ed.project.connectionActiveAt(conn, st.sliderTime)) ++active;
+            }
+            ImGui::PushStyleColor(ImGuiCol_Text, c.textSecondary);
+            ImGui::Text("%d / %d", active, static_cast<int>(ed.project.connections.size()));
+            ImGui::PopStyleColor();
+            ui::tooltip(TR("Gueltige Verbindungen an diesem Tag"));
+        }
+    }
+
     ImGui::End();
 }
 

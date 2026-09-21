@@ -174,14 +174,10 @@ std::string renderManuscript(const Project& p, const std::string& text) {
             case ManuscriptToken::Kind::Time:
                 // Die Zeitmarke steuert nur die Werte - im fertigen Text steht sie nicht.
                 break;
-            case ManuscriptToken::Kind::Action: {
-                const Action* a = p.action(t.targetId);
-                if (a)
-                    out += a->title;
-                else
-                    out += t.raw;
+            case ManuscriptToken::Kind::Action:
+                // Nur organisatorisch: die Marke sagt, an welcher Stelle im Text
+                // die Aktion passiert - im fertigen Text steht sie nicht.
                 break;
-            }
         }
     }
     return out;

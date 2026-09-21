@@ -79,12 +79,16 @@ the text are clickable variables while writing and become values when reading:
 | `@Characters/Main/Alice` | full path when two elements share a name |
 | `#Day 5, 14:00` | from here on this point in time applies |
 | `## Chapter 1` | heading, shows up in the outline |
-| `!act:…` | linked action - inserted by the program itself |
+| `!act:…` | linked action - typed as `!` or via "Place action"; **invisible** in the finished text, purely organisational |
 
 Typing `@` suggests matching elements (Tab accepts). **"Action from paragraph"** turns the
 paragraph at the cursor into an action: title from the first sentence, time from the last time
 marker, involved elements from the `@` references in that paragraph - so the timeline fills up
 while you write instead of through forms.
+
+Time and action markers are **never** part of the finished text - they only control which
+values apply and where an action belongs. While reading they can be shown via "Show
+markers".
 
 **Read** shows the same text without markers: names inserted, values resolved, actions as links.
 Both are saved - `Manuscript/manuscript.md` with the markers and `Manuscript/gelesen.md` as the
@@ -117,8 +121,9 @@ It shows up in three places:
   (`▓ Castle ▓│▓ Forest ▓│▓ Castle →`). Right click a track to set a new connection, click the
   band to select it. **"Bands"** toggles types on and off.
 - **Connections graph:** each circle shows what currently applies (`person at place: Castle`).
-  Types with more than two roles are drawn as a star with a hub. The **"State on day N"** slider
-  shows the relations at a point in time.
+  Types with more than two roles are drawn as a star with a hub. At the bottom sits the collapsible
+  **timeline**: collapsed all connections apply, expanded only those valid on the chosen day
+  (with step buttons and a "5 / 7" counter).
 - **Details:** roles, period and the elements of the selected connection.
 
 Projects from an older version keep loading: the former free-text `type` becomes a type with two

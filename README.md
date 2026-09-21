@@ -80,12 +80,16 @@ werden:
 | `@Characters/Main/Alice` | voller Pfad, falls zwei Elemente gleich heißen |
 | `#Tag 5, 14:00` | ab hier gilt dieser Zeitpunkt |
 | `## Kapitel 1` | Überschrift, erscheint in der Gliederung |
-| `!act:…` | verknüpfte Aktion – setzt das Programm selbst ein |
+| `!act:…` | verknüpfte Aktion – mit `!` beim Tippen oder über „Aktion setzen“; im fertigen Text **unsichtbar**, rein organisatorisch |
 
 Beim Tippen von `@` schlägt der Editor passende Elemente vor (Tab übernimmt). **„Aktion aus
 Absatz"** macht aus dem Absatz am Cursor eine Aktion: Titel aus dem ersten Satz, Zeitpunkt aus
 der letzten Zeitmarke, Beteiligte aus den `@`-Verweisen im Absatz – die Timeline füllt sich also
 beim Schreiben, nicht durch Formulare.
+
+Zeitmarken und Aktionsmarken stehen **nie** im fertigen Text – sie steuern nur, welche Werte
+gelten und an welcher Stelle eine Aktion hängt. Beim Lesen lassen sie sich über „Marken
+zeigen“ zur Orientierung einblenden.
 
 **Lesen** zeigt denselben Text ohne Marken: Namen eingesetzt, Werte aufgelöst, Aktionen als
 Verweis. Gespeichert wird beides – `Manuscript/manuscript.md` mit den Marken und

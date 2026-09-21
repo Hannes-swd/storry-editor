@@ -355,7 +355,17 @@ void testManuscript(Report& r) {
             "manuscript: value before the mutation");
     r.check(rendered.find("Alice schon 28") != std::string::npos,
             "manuscript: value after the mutation");
-    r.check(rendered.find("Geburtstag") != std::string::npos, "manuscript: action title inserted");
+    // Die Aktionsmarke ist nur organisatorisch: sie steuert, an welcher Stelle
+    // im Text die Aktion haengt, steht aber nicht im fertigen Text.
+    r.check(rendered.find("Geburtstag") == std::string::npos,
+            "manuscript: action marker invisible in the finished text");
+    r.check(rendered.find("!act:") == std::string::npos, "manuscript: no raw action marker left");
+    bool linkKept = false;
+    for (const ManuscriptToken& t : tokens) {
+        if (t.kind == ManuscriptToken::Kind::Action && t.resolved && t.targetId == birthday.id)
+            linkKept = true;
+    }
+    r.check(linkKept, "manuscript: action stays linked to its spot in the text");
     r.check(rendered.find("@") == std::string::npos, "manuscript: no markers left after rendering");
     r.check(rendered.find("Tag 2") == std::string::npos,
             "manuscript: time marker invisible in the finished text");

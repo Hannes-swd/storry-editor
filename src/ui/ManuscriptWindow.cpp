@@ -23,10 +23,12 @@ namespace {
 struct ManuscriptState {
     bool readMode = false;
     bool showOutline = true;
-    bool showTimeMarks = true;   // nur in der Ansicht, nie im fertigen Text
+    bool showMarks = true;       // Zeit- und Aktionsmarken: nur Ansicht, nie im Text
+    std::string actionSearch;
     std::string timeDraft;
     int cursor = 0;              // letzte bekannte Cursorposition
-    std::string completionWord;  // gerade getipptes "@..."
+    std::string completionWord;  // gerade getipptes "@..." oder "!..."
+    char completionSigil = 0;    // '@' oder '!'
     int completionStart = -1;
     int completionPick = 0;
     bool completionOpen = false;
@@ -50,21 +52,32 @@ int editCallback(ImGuiInputTextCallbackData* data) {
             st.insertRequested = false;
             st.insertText.clear();
         }
-        // Wort vor dem Cursor bestimmen, um "@" zu erkennen
+        // Wort vor dem Cursor bestimmen, um "@" (Element) oder "!" (Aktion) zu erkennen
         st.completionStart = -1;
+        st.completionSigil = 0;
         st.completionWord.clear();
         int i = data->CursorPos - 1;
         while (i >= 0) {
             const char c = data->Buf[i];
-            if (c == '@') {
+            if (c == '@' || c == '!') {
                 st.completionStart = i;
+                st.completionSigil = c;
                 st.completionWord = std::string(data->Buf + i + 1, data->Buf + data->CursorPos);
                 break;
             }
-            if (c == ' ' || c == '\n' || c == '\t') break;
-            (void)0;
+            if (c == '\n' || c == '\t') break;
+            if (c == ' ' && st.completionSigil == 0 && i < data->CursorPos - 1) {
+                // Leerzeichen beenden nur die Element-Suche, Aktionstitel duerfen welche haben
+                bool onlySpaces = true;
+                for (int k = i; k < data->CursorPos; ++k) {
+                    if (data->Buf[k] != ' ') onlySpaces = false;
+                }
+                if (!onlySpaces && data->Buf[i] == ' ' && i > 0 && data->Buf[i - 1] != '!') break;
+            }
             --i;
         }
+        if (st.completionSigil == '!' && st.completionWord.rfind("act:", 0) == 0)
+            st.completionStart = -1;  // bereits gesetzte Marke nicht erneut anbieten
     }
     return 0;
 }
@@ -198,6 +211,7 @@ void drawRendered(Editor& ed, const std::string& text, bool clickable, bool show
                 break;
             }
             case ManuscriptToken::Kind::Action: {
+                if (!showTimes) break;  // Marken ausgeblendet
                 const Action* a = ed.project.action(t.targetId);
                 std::string label = a ? std::string("-> ") + a->title : t.raw;
                 const float w = ImGui::CalcTextSize(label.c_str()).x + 10.0f;
@@ -282,13 +296,61 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
     ImGui::Checkbox(TR("Gliederung"), &st.showOutline);
     if (st.readMode) {
         ImGui::SameLine();
-        ImGui::Checkbox(TR("Zeitmarken zeigen"), &st.showTimeMarks);
+        ImGui::Checkbox(TR("Marken zeigen"), &st.showMarks);
         ui::tooltip(TR("Nur zur Orientierung beim Lesen - im Export steht sie nie."));
     }
     ImGui::SameLine();
     if (ImGui::Button(TR("Aktion aus Absatz"))) actionFromParagraph(ed, st);
     ui::tooltip(TR("Macht aus dem Absatz am Cursor eine Aktion - Beteiligte und Zeitpunkt kommen "
                    "aus dem Text."));
+    ImGui::SameLine();
+    const long long timeHereForAction =
+        timeAtOffset(ed.project, text, static_cast<size_t>(std::max(0, st.cursor)));
+    if (ImGui::Button(TR("Aktion setzen"))) {
+        st.actionSearch.clear();
+        ImGui::OpenPopup("ms_action");
+    }
+    ui::tooltip(TR("Setzt an dieser Stelle eine Marke auf eine Aktion - im fertigen Text "
+                   "unsichtbar, dient nur der Organisation. Kurzform beim Tippen: !"));
+    if (ImGui::BeginPopup("ms_action")) {
+        ui::textSecondary((TR("Hier gilt: ") + formatStoryTime(timeHereForAction)).c_str());
+        ImGui::SetNextItemWidth(260.0f);
+        ImGui::InputTextWithHint("##actsearch", TR("Aktion suchen..."), &st.actionSearch);
+        ImGui::Separator();
+        int shown = 0;
+        for (const Action* a : ed.project.sortedActions()) {
+            if (!st.actionSearch.empty() && !iequalsContains(a->title, st.actionSearch)) continue;
+            ImGui::PushID(a->id.c_str());
+            ui::textSecondary(formatStoryTime(ed.project.resolveActionTime(*a)).c_str());
+            ImGui::SameLine();
+            if (ImGui::Selectable(a->title.c_str())) {
+                insertAtCursor(st, " !act:" + a->id);
+                ed.markManuscript();
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopID();
+            if (++shown >= 10) break;
+        }
+        if (shown == 0) ui::textSecondary(TR("Keine passende Aktion."));
+        ImGui::Separator();
+        if (ImGui::Button(TR("+ Neue Aktion hier"))) {
+            ed.pushUndo(TR("Aktion erstellt"));
+            const std::string title =
+                st.actionSearch.empty() ? std::string(TR("Neue Aktion")) : st.actionSearch;
+            Action& a = ed.project.addAction(title, timeHereForAction);
+            if (!ed.project.actionTypes.empty()) a.type = ed.project.actionTypes.front();
+            size_t begin = 0, end = 0;
+            paragraphAt(text, static_cast<size_t>(std::max(0, st.cursor)), &begin, &end);
+            a.elementIds = mentionedElements(ed.project, text.substr(begin, end - begin));
+            insertAtCursor(st, " !act:" + a.id);
+            ed.markActions();
+            ed.markManuscript();
+            ed.select(SelKind::Action, a.id);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
     ImGui::SameLine();
     const long long timeHere =
         timeAtOffset(ed.project, text, static_cast<size_t>(std::max(0, st.cursor)));
@@ -372,7 +434,7 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
     // -------------------------------------------------------------- pages
     ImGui::BeginChild("page", ImVec2(0, 0), ImGuiChildFlags_Borders);
     if (st.readMode) {
-        drawRendered(ed, text, true, st.showTimeMarks);
+        drawRendered(ed, text, true, st.showMarks);
     } else {
         ImGui::PushStyleColor(ImGuiCol_FrameBg, theme::mix(c.panelBackground, c.backgroundColor, 0.2f));
         const ImGuiInputTextFlags flags =
@@ -391,8 +453,20 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
             std::vector<std::string> labels;    // was angezeigt wird
             std::vector<ImVec4> colors;
             bool fieldMode = false;
+            const bool actionMode = st.completionSigil == '!';
 
-            if (dot != std::string::npos) {
+            if (actionMode) {
+                for (const Action* a : ed.project.sortedActions()) {
+                    if (!st.completionWord.empty() &&
+                        !iequalsContains(a->title, st.completionWord))
+                        continue;
+                    matches.push_back("act:" + a->id);
+                    labels.push_back(formatStoryTime(ed.project.resolveActionTime(*a)) + "  " +
+                                     a->title);
+                    colors.push_back(theme::colors().warningColor);
+                    if (matches.size() >= 8) break;
+                }
+            } else if (dot != std::string::npos) {
                 const std::string elementPart = st.completionWord.substr(0, dot);
                 const std::string fieldPart = st.completionWord.substr(dot + 1);
                 const Element* owner = nullptr;
@@ -413,7 +487,7 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
                     }
                 }
             }
-            if (!fieldMode) {
+            if (!fieldMode && !actionMode) {
                 for (const Element& el : ed.project.elements) {
                     if (st.completionWord.empty() || iequalsContains(el.name, st.completionWord) ||
                         iequalsContains(ed.project.elementPath(el.id), st.completionWord)) {
@@ -433,8 +507,9 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
                              ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
                                  ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav |
                                  ImGuiWindowFlags_NoMove);
-                ui::textSecondary(fieldMode ? TR("Feld waehlen - Tab uebernimmt")
-                                            : TR("Tab uebernimmt, Esc schliesst"));
+                ui::textSecondary(actionMode  ? TR("Aktion waehlen - Tab uebernimmt")
+                                  : fieldMode ? TR("Feld waehlen - Tab uebernimmt")
+                                              : TR("Tab uebernimmt, Esc schliesst"));
                 for (size_t i = 0; i < matches.size(); ++i) {
                     ui::colorDot(colors[i]);
                     const bool picked = static_cast<int>(i) == st.completionPick;
