@@ -30,6 +30,7 @@ Kommandozeile:
 
 | Fenster | Spec | Inhalt |
 | --- | --- | --- |
+| **Manuskript** | - | Schreibflaeche mit klickbaren Marken, Gliederung, Lesemodus, "Aktion aus Absatz" |
 | **Timeline** | 3.1 | Spuren je Gruppe/Element, Ereignisse als Punkte, nicht-lineare Zeitskala (dichte Bereiche gedehnt, leere Zeiträume komprimiert mit „~ 5 Tage“-Markierung), Hover-Tooltip, Klick, Rechtsklick-Menü, Drag & Drop zum Verschieben (Ghost-Vorschau), Doppelklick = neue Aktion, Strg+Rad = Zoom, Filter nach Gruppe/Typ/Element/Zeitfenster, verschiebbare Spurtitel-Breite |
 | **Gruppen-Manager** | 3.2 | Hierarchiebaum mit Farben, Drag & Drop zum Umsortieren, Kontextmenüs, Template-Editor mit Feld-Dialog (9 Feldtypen, Pflichtfelder, Defaults, Enum-Optionen), Vererbung an Untergruppen |
 | **Details** | 3.1.7 / 3.2.3 | Detailpanel für Element, Aktion, Gruppe oder Verbindung – Felder inline editierbar, Werteverlauf über die Zeit, Beziehungen, verknüpfte Aktionen |
@@ -65,6 +66,30 @@ ans Design an.
 
 Jede Einzelfarbe lässt sich darunter weiter anpassen; **Design neu laden**
 stellt das gewählte Preset wieder her. Die Wahl landet in `settings.json`.
+
+## Das Manuskript
+
+Hier wird geschrieben – der Text ist die Hauptsache, die Struktur fällt nebenbei ab. Im Text
+stehen kurze Marken, die beim Schreiben anklickbare Variablen sind und beim Lesen zu Werten
+werden:
+
+| Marke | Bedeutung |
+| --- | --- |
+| `@Alice` | Verweis auf ein Element; zeigt den Namen, Klick öffnet die Details |
+| `@Alice.age` | Wert des Feldes **zu diesem Zeitpunkt der Geschichte** (Mutations werden angewendet) |
+| `@Characters/Main/Alice` | voller Pfad, falls zwei Elemente gleich heißen |
+| `#Tag 5, 14:00` | ab hier gilt dieser Zeitpunkt |
+| `## Kapitel 1` | Überschrift, erscheint in der Gliederung |
+| `!act:…` | verknüpfte Aktion – setzt das Programm selbst ein |
+
+Beim Tippen von `@` schlägt der Editor passende Elemente vor (Tab übernimmt). **„Aktion aus
+Absatz"** macht aus dem Absatz am Cursor eine Aktion: Titel aus dem ersten Satz, Zeitpunkt aus
+der letzten Zeitmarke, Beteiligte aus den `@`-Verweisen im Absatz – die Timeline füllt sich also
+beim Schreiben, nicht durch Formulare.
+
+**Lesen** zeigt denselben Text ohne Marken: Namen eingesetzt, Werte aufgelöst, Aktionen als
+Verweis. Gespeichert wird beides – `Manuscript/manuscript.md` mit den Marken und
+`Manuscript/gelesen.md` als fertiger Lesetext für Obsidian.
 
 ## Verbindungen: eigene Vorlagen mit Rollen
 

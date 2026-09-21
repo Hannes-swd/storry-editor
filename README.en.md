@@ -40,6 +40,7 @@ accepted when reading, so switching the language never breaks an existing vault.
 
 | Window | Spec | Content |
 | --- | --- | --- |
+| **Manuscript** | - | Writing surface with clickable markers, outline, read mode, "action from paragraph" |
 | **Timeline** | 3.1 | Tracks per group/element, events as dots, non-linear time scale (dense areas stretched, empty stretches compressed and marked "~ 5 days"), hover tooltip, click, context menu, drag & drop with ghost preview, double click = new action, Ctrl+wheel = zoom, filters by group/type/element/time window, resizable track title column |
 | **Group manager** | 3.2 | Hierarchy tree with colours, drag & drop, context menus, template editor with field dialog (9 field types, required fields, defaults, enum options), inheritance to subgroups |
 | **Details** | 3.1.7 / 3.2.3 | Detail panel for element, action, group or connection – fields editable inline, value history over time, relations, linked actions |
@@ -65,6 +66,29 @@ headers) are mixed from the panel and accent colour, which keeps the text readab
 themes. The automatically assigned group colours adapt their saturation and brightness.
 
 Every single colour can be adjusted below; **Reload theme** restores the selected preset.
+
+## The manuscript
+
+This is where you write - the text is the point, the structure falls out of it. Short markers in
+the text are clickable variables while writing and become values when reading:
+
+| Marker | Meaning |
+| --- | --- |
+| `@Alice` | reference to an element; shows the name, click opens the details |
+| `@Alice.age` | value of that field **at this point in the story** (mutations applied) |
+| `@Characters/Main/Alice` | full path when two elements share a name |
+| `#Day 5, 14:00` | from here on this point in time applies |
+| `## Chapter 1` | heading, shows up in the outline |
+| `!act:…` | linked action - inserted by the program itself |
+
+Typing `@` suggests matching elements (Tab accepts). **"Action from paragraph"** turns the
+paragraph at the cursor into an action: title from the first sentence, time from the last time
+marker, involved elements from the `@` references in that paragraph - so the timeline fills up
+while you write instead of through forms.
+
+**Read** shows the same text without markers: names inserted, values resolved, actions as links.
+Both are saved - `Manuscript/manuscript.md` with the markers and `Manuscript/gelesen.md` as the
+finished reading text for Obsidian.
 
 ## Connections: your own templates with roles
 
