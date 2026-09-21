@@ -1,0 +1,76 @@
+# ---------------------------------------------------------------- build output
+# CMake legt hier alles ab, inklusive der geladenen Abhaengigkeiten
+# (_deps: imgui, nlohmann/json, stb_image) - nichts davon gehoert ins Repo.
+/build*/
+/out/
+/release/
+/cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+compile_commands.json
+
+# ------------------------------------------------------------- Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.VC.db
+*.VC.VC.opendb
+*.aps
+*.opensdf
+*.sdf
+*.suo
+*.user
+
+# ----------------------------------------------------------------- Binaerdaten
+*.exe
+*.dll
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.idb
+*.obj
+*.o
+*.a
+*.so
+*.dylib
+*.log
+*.tlog
+
+# --------------------------------------------------------------------- Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# ------------------------------------------------------------ Story Editor
+# Laufzeit-Dateien des Programms. Normalerweise liegen sie in
+# %APPDATA%/StoryEditor, hier zur Sicherheit, falls jemand aus dem Projekt-
+# ordner heraus startet.
+imgui.ini
+imgui_layout.ini
+settings.json
+selftest.txt
+
+# Obsidian-Vaults gehoeren nicht in dieses Repo - das ist der Inhalt des
+# Benutzers, nicht der Code. Falls du einen Vault doch versionieren willst,
+# nimm ein eigenes Repo dafuer (oder loesche die passende Zeile).
+/DemoStory/
+/vaults/
+*.vault/
+
+# --------------------------------------------------------------- Betriebssystem
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Persoenliche Notiz/Entwurf - nicht Teil des veroeffentlichten Projekts.
+# Zeile loeschen, falls du sie doch mit ins Repo nehmen willst.
+promt-alt.md
