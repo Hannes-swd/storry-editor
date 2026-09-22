@@ -30,7 +30,7 @@ Kommandozeile:
 
 | Fenster | Spec | Inhalt |
 | --- | --- | --- |
-| **Manuskript** | - | Schreibflaeche mit klickbaren Marken, Gliederung, Lesemodus, "Aktion aus Absatz" |
+| **Manuskript** | - | Schreibflaeche mit klickbaren Marken, Gliederung, Lesemodus, "Aktion aus Absatz", Word-Export |
 | **Timeline** | 3.1 | Spuren je Gruppe/Element, Ereignisse als Punkte, nicht-lineare Zeitskala (dichte Bereiche gedehnt, leere Zeiträume komprimiert mit „~ 5 Tage“-Markierung), Hover-Tooltip, Klick, Rechtsklick-Menü, Drag & Drop zum Verschieben (Ghost-Vorschau), Doppelklick = neue Aktion, Strg+Rad = Zoom, Filter nach Gruppe/Typ/Element/Zeitfenster, verschiebbare Spurtitel-Breite |
 | **Gruppen-Manager** | 3.2 | Hierarchiebaum mit Farben, Drag & Drop zum Umsortieren, Kontextmenüs, Template-Editor mit Feld-Dialog (9 Feldtypen, Pflichtfelder, Defaults, Enum-Optionen), Vererbung an Untergruppen |
 | **Details** | 3.1.7 / 3.2.3 | Detailpanel für Element, Aktion, Gruppe oder Verbindung – Felder inline editierbar, Werteverlauf über die Zeit, Beziehungen, verknüpfte Aktionen |
@@ -94,6 +94,13 @@ zeigen“ zur Orientierung einblenden.
 **Lesen** zeigt denselben Text ohne Marken: Namen eingesetzt, Werte aufgelöst, Aktionen als
 Verweis. Gespeichert wird beides – `Manuscript/manuscript.md` mit den Marken und
 `Manuscript/gelesen.md` als fertiger Lesetext für Obsidian.
+
+### Als Word-Datei herausgeben
+
+„Als Word" in der Manuskript-Leiste – oder *Datei → Manuskript als Word (.docx)…* – schreibt
+genau diesen fertigen Text als `.docx`: Werte fest eingetragen, Zeit- und Aktionsmarken nicht
+enthalten. Der Projektname wird zum Titel, `## Kapitel` zu einer Word-Überschrift, Leerzeilen
+trennen Absätze. Die Datei braucht kein Word zum Erzeugen – das Programm baut das Paket selbst.
 
 ## Verbindungen: eigene Vorlagen mit Rollen
 

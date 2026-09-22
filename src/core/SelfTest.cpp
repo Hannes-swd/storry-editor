@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "app/Platform.h"
+#include "core/DocxExport.h"
 #include "core/Manuscript.h"
 #include "core/Project.h"
 #include "core/StoryTime.h"
@@ -403,6 +404,55 @@ void testManuscript(Report& r) {
     r.check(renderManuscript(p, unknown) == unknown, "manuscript: unknown reference kept");
 }
 
+// Word-Export: gueltiges ZIP, fertige Werte, keine Marken.
+void testWordExport(Report& r) {
+    Project p;
+    Group& chars = p.addGroup("Characters", "");
+    chars.fields.push_back({"age", FieldType::Integer, false, "27", "", "", {}});
+    Element& alice = p.addElement("Alice", chars.id);
+    alice.values["age"] = "27";
+    Action& birthday = p.addAction("Geburtstag", 10 * kMinutesPerDay);
+    birthday.mutations.push_back({alice.id, "age", "27", "28"});
+
+    p.name = "Meine Geschichte";
+    p.manuscript =
+        "## Kapitel 1\n"
+        "#Tag 12, 09:00\n"
+        "@Alice ist @Alice.age Jahre alt & <stark>.\n"
+        "Zweite Zeile. !act:" + birthday.id + "\n";
+
+    const std::string docx = buildManuscriptDocx(p, p.name);
+
+    r.check(docx.size() > 1000, "docx: package has content");
+    r.check(docx.compare(0, 4, "PK\x03\x04") == 0, "docx: starts with a zip header");
+    r.check(docx.find(std::string("PK\x05\x06", 4)) != std::string::npos, "docx: has an end-of-directory record");
+    for (const char* part : {"[Content_Types].xml", "word/document.xml", "word/styles.xml",
+                             "word/_rels/document.xml.rels", "_rels/.rels", "docProps/core.xml"})
+        r.check(docx.find(part) != std::string::npos, std::string("docx: contains ") + part);
+
+    // Unkomprimiert gespeichert: der Text steht unveraendert im Paket.
+    r.check(docx.find("Alice ist 28 Jahre alt") != std::string::npos,
+            "docx: value baked in at the right point in time");
+    r.check(docx.find("&amp;") != std::string::npos && docx.find("&lt;stark&gt;") != std::string::npos,
+            "docx: xml special characters escaped");
+    r.check(docx.find("!act:") == std::string::npos, "docx: no action marker in the text");
+    r.check(docx.find("#Tag 12") == std::string::npos, "docx: no time marker in the text");
+    r.check(docx.find("<w:pStyle w:val=\"Heading1\"/>") != std::string::npos,
+            "docx: heading becomes a Word heading");
+    r.check(docx.find("<w:t xml:space=\"preserve\">Kapitel 1</w:t>") != std::string::npos,
+            "docx: heading text without the hashes");
+    r.check(docx.find("<w:br/>") != std::string::npos, "docx: soft line break inside a paragraph");
+    r.check(docx.find("<w:pStyle w:val=\"Title\"/>") != std::string::npos &&
+                docx.find("Meine Geschichte") != std::string::npos,
+            "docx: project name as the title");
+
+    // Leeres Manuskript darf kein kaputtes Dokument ergeben.
+    Project empty;
+    empty.name = "Leer";
+    const std::string emptyDocx = buildManuscriptDocx(empty, empty.name);
+    r.check(emptyDocx.compare(0, 4, "PK\x03\x04") == 0, "docx: empty manuscript still valid");
+}
+
 }  // namespace
 
 int createDemoProject(const std::string& vaultPath) {
@@ -527,6 +577,7 @@ int runSelfTest(const std::string& reportPath) {
     testVaultRoundTrip(r);
     testLegacyConnections(r);
     testManuscript(r);
+    testWordExport(r);
     r.os << "---------------------\n"
          << r.passed << " ok, " << r.failed << " fehlgeschlagen\n";
 

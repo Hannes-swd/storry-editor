@@ -40,7 +40,7 @@ accepted when reading, so switching the language never breaks an existing vault.
 
 | Window | Spec | Content |
 | --- | --- | --- |
-| **Manuscript** | - | Writing surface with clickable markers, outline, read mode, "action from paragraph" |
+| **Manuscript** | - | Writing surface with clickable markers, outline, read mode, "action from paragraph", Word export |
 | **Timeline** | 3.1 | Tracks per group/element, events as dots, non-linear time scale (dense areas stretched, empty stretches compressed and marked "~ 5 days"), hover tooltip, click, context menu, drag & drop with ghost preview, double click = new action, Ctrl+wheel = zoom, filters by group/type/element/time window, resizable track title column |
 | **Group manager** | 3.2 | Hierarchy tree with colours, drag & drop, context menus, template editor with field dialog (9 field types, required fields, defaults, enum options), inheritance to subgroups |
 | **Details** | 3.1.7 / 3.2.3 | Detail panel for element, action, group or connection – fields editable inline, value history over time, relations, linked actions |
@@ -93,6 +93,13 @@ markers".
 **Read** shows the same text without markers: names inserted, values resolved, actions as links.
 Both are saved - `Manuscript/manuscript.md` with the markers and `Manuscript/gelesen.md` as the
 finished reading text for Obsidian.
+
+### Exporting as a Word file
+
+"As Word" in the manuscript bar - or *File -> Manuscript as Word (.docx)...* - writes exactly
+that finished text as a `.docx`: values baked in, time and action markers left out. The project
+name becomes the title, `## Chapter` becomes a Word heading, blank lines separate paragraphs.
+No Word installation is needed to produce it - the program builds the package itself.
 
 ## Connections: your own templates with roles
 

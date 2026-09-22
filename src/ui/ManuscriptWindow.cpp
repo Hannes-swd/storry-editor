@@ -399,6 +399,11 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
     }
 
     ImGui::SameLine();
+    if (ImGui::Button(TR("Als Word"))) ed.exportManuscriptToWord();
+    ui::tooltip(TR("Schreibt die fertige Geschichte: Werte sind fest eingesetzt, "
+                   "Zeit- und Aktionsmarken stehen nicht darin."));
+
+    ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Text, c.textSecondary);
     ImGui::Text("%zu %s", countWords(text), TR("Woerter"));
     ImGui::PopStyleColor();

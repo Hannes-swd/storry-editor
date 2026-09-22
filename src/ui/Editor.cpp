@@ -8,6 +8,7 @@
 #include "imgui_stdlib.h"
 
 #include "app/Platform.h"
+#include "core/DocxExport.h"
 #include "core/StoryTime.h"
 #include "core/VaultIO.h"
 #include "ui/Lang.h"
@@ -212,6 +213,33 @@ void Editor::saveEverything() {
     }
 }
 
+void Editor::exportManuscriptToWord(const std::string& path) {
+    if (!project.loaded) return;
+
+    std::string target = path;
+    if (target.empty()) {
+        // Dateiname aus dem Projektnamen, ohne Zeichen, die Windows nicht mag.
+        std::string suggestion;
+        for (char ch : project.name) {
+            const bool bad = ch == '\\' || ch == '/' || ch == ':' || ch == '*' || ch == '?' ||
+                             ch == '"' || ch == '<' || ch == '>' || ch == '|';
+            suggestion.push_back(bad ? '-' : ch);
+        }
+        if (suggestion.empty()) suggestion = "Manuskript";
+        suggestion += ".docx";
+        target = platform::saveFileDialog(TR("Manuskript als Word-Datei speichern"),
+                                          suggestion.c_str());
+        if (target.empty()) return;  // abgebrochen
+    }
+    if (target.size() < 5 || target.compare(target.size() - 5, 5, ".docx") != 0) target += ".docx";
+
+    std::string err;
+    if (exportManuscriptDocx(project, target, &err))
+        setStatus(TR("Word-Datei geschrieben: ") + target);
+    else
+        setStatus(err.empty() ? TR("Word-Datei konnte nicht geschrieben werden.") : err, true);
+}
+
 void Editor::deleteElementWithFile(const std::string& id) {
     Element* el = project.element(id);
     if (!el) return;
@@ -263,6 +291,12 @@ void Editor::drawMainMenuBar() {
         if (ImGui::MenuItem(TR("Vault im Explorer oeffnen"), nullptr, false, project.loaded))
             platform::openInShell(project.vaultPath);
         if (ImGui::MenuItem(TR("Projekt schliessen"), nullptr, false, project.loaded)) closeProject();
+        ImGui::Separator();
+        if (ImGui::MenuItem(TR("Manuskript als Word (.docx)..."), nullptr, false, project.loaded))
+            exportManuscriptToWord();
+        if (ImGui::IsItemHovered())
+            ui::tooltip(TR("Schreibt die fertige Geschichte: Werte sind fest eingesetzt, "
+                           "Zeit- und Aktionsmarken stehen nicht darin."));
         ImGui::Separator();
         if (ImGui::MenuItem(TR("Beenden"), "Alt+F4")) quitRequested = true;
         ImGui::EndMenu();

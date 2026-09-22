@@ -77,6 +77,7 @@ add_executable(StoryEditor WIN32
     src/app/TextureCache.cpp
     src/core/StoryTime.cpp
     src/core/Manuscript.cpp
+    src/core/DocxExport.cpp
     src/core/Model.cpp
     src/core/Project.cpp
     src/core/VaultIO.cpp

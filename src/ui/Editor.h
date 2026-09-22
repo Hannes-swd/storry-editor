@@ -52,6 +52,9 @@ public:
     void closeProject();
     void saveEverything();
 
+    // Manuskript als Word-Datei ablegen (fragt nach dem Ziel, wenn `path` leer ist).
+    void exportManuscriptToWord(const std::string& path = std::string());
+
     // -------------------------------------------------------------- commands
     void pushUndo(const std::string& label);
     void undo();
