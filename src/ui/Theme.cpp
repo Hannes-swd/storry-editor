@@ -100,6 +100,22 @@ void applyPreset(ThemePreset preset) {
     c.groupColors.clear();
 }
 
+Fonts& fonts() {
+    static Fonts f;
+    return f;
+}
+
+ImFont* fontFor(bool bold, bool italic) {
+    Fonts& f = fonts();
+    ImFont* wanted = nullptr;
+    if (bold && italic) wanted = f.boldItalic;
+    else if (bold) wanted = f.bold;
+    else if (italic) wanted = f.italic;
+    if (!wanted && bold) wanted = f.bold;
+    if (!wanted && italic) wanted = f.italic;
+    return wanted ? wanted : f.regular;
+}
+
 ImU32 u32(const ImVec4& c, float alphaScale) {
     ImVec4 col = c;
     col.w *= alphaScale;

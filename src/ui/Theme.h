@@ -78,6 +78,18 @@ void applyImGuiStyle();
 bool load();
 bool save();
 
+// Schriftschnitte fuer das Manuskript. Fehlt einer auf dem System, liefert der
+// Zugriff die normale Schrift zurueck - die UI bleibt also immer lesbar.
+struct Fonts {
+    ImFont* regular = nullptr;
+    ImFont* bold = nullptr;
+    ImFont* italic = nullptr;
+    ImFont* boldItalic = nullptr;
+};
+
+Fonts& fonts();
+ImFont* fontFor(bool bold, bool italic);
+
 ImU32 u32(const ImVec4& c, float alphaScale = 1.0f);
 ImVec4 mix(const ImVec4& a, const ImVec4& b, float t);
 // Fuellfarbe fuer hervorgehobene Schaltflaechen (aktive Filter o.ae.), die in

@@ -479,6 +479,114 @@ const Entry kTable[] = {
     {"\" zurueckgesetzt.", "\" restored."},
     {"Design \"", "Theme \""},
 
+    // ------------------------------------------- Manuskript: Leiste und Suche
+    {"Text bearbeiten - Marken sind sichtbar.", "Edit the text - markers are visible."},
+    {"So liest sich die Geschichte fertig - alle Werte sind eingesetzt.",
+     "This is how the finished story reads - all values are filled in."},
+    {"Elemente, Werte, Aktionen und Zeitpunkte in den Text setzen - ohne "
+     "Sonderzeichen tippen zu muessen.",
+     "Put elements, values, actions and points in time into the text - "
+     "without typing any special characters."},
+    {"Element (Figur, Ort, Ding)", "Element (character, place, thing)"},
+    {"Wert eines Elements", "Value of an element"},
+    {"Aktion verknuepfen", "Link an action"},
+    {"Aktion aus diesem Absatz", "Action from this paragraph"},
+    {"Legt eine Aktion zum Zeitpunkt dieser Stelle an und verknuepft sie.",
+     "Creates an action at the point in time of this spot and links it."},
+    {"Zeitpunkt weiterstellen", "Move time on"},
+    {"Nichts gefunden.", "Nothing found."},
+    {"Dieses Element hat keine Felder.", "This element has no fields."},
+    {"Zurueck", "Back"},
+    {"Format", "Format"},
+    {"Ueberschriften und Hervorhebungen.", "Headings and emphasis."},
+    {"Kapitel", "Chapter"},
+    {"Neues Kapitel", "New chapter"},
+    {"Szene", "Scene"},
+    {"Neue Szene", "New scene"},
+    {"Szenenwechsel", "Scene break"},
+    {"Erscheint links in der Gliederung und im Word-Export als Ueberschrift.",
+     "Shows up in the outline on the left and as a heading in the Word "
+     "export."},
+    {"Eine Trennung mitten im Kapitel - im Export als * * * zentriert.",
+     "A break inside a chapter - exported as a centred * * *."},
+    {"Fett", "Bold"},
+    {"Kursiv", "Italic"},
+    {"Strg+B", "Ctrl+B"},
+    {"Strg+I", "Ctrl+I"},
+    {"Markierten Text hervorheben - ohne Auswahl schreibst du zwischen den "
+     "Zeichen weiter.",
+     "Emphasises the selected text - without a selection you keep typing "
+     "between the markers."},
+    {"Suchen", "Find"},
+    {"Stellen im Text finden und ersetzen (Strg+F).",
+     "Find and replace spots in the text (Ctrl+F)."},
+    {"Im Text suchen...", "Search the text..."},
+    {"Ersetzen durch...", "Replace with..."},
+    {"Ersetzen", "Replace"},
+    {"Alle ersetzen", "Replace all"},
+    {" Stellen ersetzt.", " spots replaced."},
+    {"Naechster Treffer (F3)", "Next hit (F3)"},
+    {"Vorheriger Treffer (Shift+F3)", "Previous hit (Shift+F3)"},
+    {"kein Treffer", "no hit"},
+    {"Gross/klein", "Aa"},
+    {"Gross- und Kleinschreibung beachten", "Match case"},
+    {"Als Word speichern...", "Save as Word..."},
+    {"Gespeichert", "Saved"},
+    {"Alles steht im Vault.", "Everything is in the vault."},
+    {"Wird gleich von selbst geschrieben - Klick speichert sofort.",
+     "Will be written by itself in a moment - click to save right now."},
+    {"Automatisches Speichern ist aus. Klicken oder Strg+S.",
+     "Autosave is off. Click or press Ctrl+S."},
+    {"Klick springt an die Stelle im Text.", "A click jumps to that spot in the text."},
+    {"Kapitel und Zeitpunkte aus dem Menue \"Format\" bzw. \"Einfuegen\" "
+     "erscheinen hier.",
+     "Chapters and points in time from the \"Format\" and \"Insert\" menus "
+     "show up here."},
+    {"Der Absatz am Cursor ist leer.", "The paragraph at the cursor is empty."},
+    {"Einfach losschreiben - wie in jedem Textprogramm. Figuren, Werte, "
+     "Zeitpunkte und Ueberschriften setzt du oben ueber \"Einfuegen\" und "
+     "\"Format\" ein. Das \"?\" erklaert den Rest.",
+     "Just start writing - like in any word processor. Characters, values, "
+     "points in time and headings go in via \"Insert\" and \"Format\" above. "
+     "The \"?\" explains the rest."},
+    {"Wie das Schreiben hier funktioniert", "How writing works here"},
+    {"Kurz erklaert, wie dieses Fenster funktioniert.",
+     "A short explanation of how this window works."},
+    {"Schreib einfach los wie in jedem Textprogramm. Alles Weitere setzt die "
+     "Leiste oben fuer dich ein - du musst dir keine Sonderzeichen merken.",
+     "Just start writing like in any word processor. The bar above inserts "
+     "everything else for you - there are no special characters to memorise."},
+    {"Die Marken sind nur im Schreibmodus zu sehen. Im Lesemodus und in der "
+     "Word-Datei steht der fertige Text.",
+     "Markers only show while writing. Reading mode and the Word file carry "
+     "the finished text."},
+    {"Eine Figur, ein Ort, ein Ding nennen", "Name a character, a place, a thing"},
+    {"Einfuegen > Element - oder einfach @ tippen und weiterschreiben.",
+     "Insert > Element - or simply type @ and keep going."},
+    {"Einen Wert einsetzen (Alter, Titel, Zustand)", "Insert a value (age, title, condition)"},
+    {"Einfuegen > Wert eines Elements. Im Text steht dann immer der Wert, "
+     "der zu diesem Zeitpunkt der Geschichte gilt.",
+     "Insert > Value of an element. The text then always carries the value "
+     "that applies at that point in the story."},
+    {"Zeit vergehen lassen", "Let time pass"},
+    {"Einfuegen > Zeitpunkt. Die Zeit bleibt stehen, bis du sie "
+     "weiterstellst.",
+     "Insert > Point in time. Time stays put until you move it on."},
+    {"Eine Stelle als Ereignis merken", "Record a spot as an event"},
+    {"Einfuegen > Aktion aus diesem Absatz - Beteiligte und Zeitpunkt kommen "
+     "aus dem Text.",
+     "Insert > Action from this paragraph - involved elements and time come "
+     "from the text."},
+    {"Kapitel und Szenen gliedern", "Structure chapters and scenes"},
+    {"Format > Kapitel bzw. Szene. Beides erscheint links in der Gliederung.",
+     "Format > Chapter or Scene. Both show up in the outline on the left."},
+    {"Hervorheben", "Emphasise"},
+    {"Format > Fett / Kursiv, oder Strg+B und Strg+I.",
+     "Format > Bold / Italic, or Ctrl+B and Ctrl+I."},
+    {"Etwas wiederfinden", "Find something again"},
+    {"Suchen (Strg+F) - findet auch Namen und Marken.",
+     "Find (Ctrl+F) - it also finds names and markers."},
+
     // ---------------------------------------------------------- Manuskript
     {"Manuskript", "Manuscript"},
     {"Schreiben", "Write"},
@@ -494,8 +602,21 @@ const Entry kTable[] = {
     {"Woerter", "words"},
     {"Ueberschriften mit ## und Zeitmarken mit # erscheinen hier.",
      "Headings with ## and time markers with # show up here."},
-    {"Einfach losschreiben. @Name verweist auf ein Element, @Name.feld setzt dessen Wert ein, #Tag 5 setzt den Zeitpunkt.",
-     "Just start writing. @Name refers to an element, @Name.field inserts its value, #Day 5 sets the point in time."},
+    {"Einfach losschreiben. @Name verweist auf ein Element, @Name.feld setzt dessen Wert ein. Wie viel Zeit inzwischen vergangen ist, stellst du oben ueber \"Zeit: ...\" weiter.",
+     "Just start writing. @Name refers to an element, @Name.field inserts its value. How much "
+     "time has passed meanwhile is set above via \"Time: ...\"."},
+    {"Der Zeitpunkt, an dem die Geschichte an dieser Stelle steht. Klicken, um die Zeit ab hier weiterzustellen.",
+     "The point in time the story is at in this spot. Click to move time on from here."},
+    {"Die Zeit laeuft nicht von allein weiter: sie bleibt stehen, bis du sie weiterstellst. Ab der Marke gilt der neue Zeitpunkt fuer alles, was danach im Text kommt.",
+     "Time does not move on by itself: it stays put until you move it. From the marker on, the "
+     "new point in time applies to everything that follows in the text."},
+    {"Hier gilt gerade: ", "Currently in effect here: "},
+    {"Weiter um:", "Move on by:"},
+    {"Oder fester Zeitpunkt:", "Or a fixed point in time:"},
+    {"+ 1 Stunde", "+ 1 hour"},
+    {"+ 6 Stunden", "+ 6 hours"},
+    {"z.B. \"Tag 5, 14:00\" oder \"Jahr 2, Monat 3, Tag 15\"",
+     "e.g. \"Day 5, 14:00\" or \"Year 2, Month 3, Day 15\""},
     {"Enter uebernimmt, Pfeile waehlen, Esc schliesst", "Enter accepts, arrows choose, Esc closes"},
     {"Feld waehlen - Enter uebernimmt", "Pick a field - Enter accepts"},
     {"Feld ist leer - es wird der Name benutzt.", "The field is empty - the name is used instead."},

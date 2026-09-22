@@ -404,6 +404,63 @@ void testManuscript(Report& r) {
     r.check(renderManuscript(p, unknown) == unknown, "manuscript: unknown reference kept");
 }
 
+// Hervorhebung, Szenenwechsel und Suche - alles, was die Leiste im
+// Manuskript-Fenster einsetzt, muss der Parser auch wieder verstehen.
+void testManuscriptFormatting(Report& r) {
+    Project p;
+    Group& chars = p.addGroup("Characters", "");
+    p.addElement("Alice", chars.id);
+
+    const std::string text = "Er rief **laut** und *leise* nach @Alice.";
+    size_t boldRuns = 0, italicRuns = 0;
+    bool markedElement = false;
+    for (const ManuscriptToken& t : parseManuscript(p, text)) {
+        if (t.kind == ManuscriptToken::Kind::Text && t.bold) ++boldRuns;
+        if (t.kind == ManuscriptToken::Kind::Text && t.italic) ++italicRuns;
+        if (t.kind == ManuscriptToken::Kind::Element && (t.bold || t.italic)) markedElement = true;
+    }
+    r.check(boldRuns == 1, "manuscript: bold run recognised");
+    r.check(italicRuns == 1, "manuscript: italic run recognised");
+    r.check(!markedElement, "manuscript: reference outside the emphasis stays plain");
+    r.check(renderManuscript(p, text) == "Er rief laut und leise nach Alice.",
+            "manuscript: emphasis characters gone in the finished text");
+    r.check(renderManuscript(p, text, true) == "Er rief **laut** und *leise* nach Alice.",
+            "manuscript: emphasis kept for the export");
+
+    // Ein einzelnes Sternchen ohne Gegenstueck bleibt gewoehnlicher Text.
+    const std::string stray = "3 * 4 ist zwoelf.";
+    r.check(renderManuscript(p, stray) == stray, "manuscript: lone asterisk stays text");
+
+    // Eine offene Hervorhebung endet spaetestens am Absatz.
+    const std::string leaking = "Anfang *offen\n\nNaechster Absatz.";
+    bool laterRunItalic = false;
+    for (const ManuscriptToken& t : parseManuscript(p, leaking)) {
+        if (t.kind == ManuscriptToken::Kind::Text && t.italic &&
+            t.raw.find("Naechster") != std::string::npos)
+            laterRunItalic = true;
+    }
+    r.check(!laterRunItalic, "manuscript: emphasis does not leak into the next paragraph");
+
+    // Szenenwechsel
+    size_t breaks = 0;
+    for (const ManuscriptToken& t : parseManuscript(p, "Erst.\n---\nDann.")) {
+        if (t.kind == ManuscriptToken::Kind::Break) ++breaks;
+    }
+    r.check(breaks == 1, "manuscript: scene break recognised");
+    r.check(renderManuscript(p, "Erst.\n---\nDann.").find("* * *") != std::string::npos,
+            "manuscript: scene break rendered as a separator");
+    r.check(renderManuscript(p, "Erst.\n---\nDann.", true).find("---") != std::string::npos,
+            "manuscript: scene break kept for the export");
+
+    // Suche im Text: Grundlage fuer Suchen/Ersetzen im Fenster.
+    const std::string haystack = "Alice und alice und ALICE";
+    r.check(findAll(haystack, "alice", false).size() == 3, "find: case insensitive hits");
+    r.check(findAll(haystack, "alice", true).size() == 1, "find: case sensitive hits");
+    r.check(findAll(haystack, "alice", false).front() == 0, "find: first hit at the start");
+    r.check(findAll(haystack, "", false).empty(), "find: empty needle finds nothing");
+    r.check(findAll("aaaa", "aa", false).size() == 2, "find: hits do not overlap");
+}
+
 // Word-Export: gueltiges ZIP, fertige Werte, keine Marken.
 void testWordExport(Report& r) {
     Project p;
@@ -419,7 +476,9 @@ void testWordExport(Report& r) {
         "## Kapitel 1\n"
         "#Tag 12, 09:00\n"
         "@Alice ist @Alice.age Jahre alt & <stark>.\n"
-        "Zweite Zeile. !act:" + birthday.id + "\n";
+        "Zweite Zeile. !act:" + birthday.id + "\n\n"
+        "---\n\n"
+        "Sie war **sehr** *muede*.\n";
 
     const std::string docx = buildManuscriptDocx(p, p.name);
 
@@ -442,6 +501,12 @@ void testWordExport(Report& r) {
     r.check(docx.find("<w:t xml:space=\"preserve\">Kapitel 1</w:t>") != std::string::npos,
             "docx: heading text without the hashes");
     r.check(docx.find("<w:br/>") != std::string::npos, "docx: soft line break inside a paragraph");
+    r.check(docx.find("<w:b/>") != std::string::npos, "docx: bold becomes a Word run property");
+    r.check(docx.find("<w:i/>") != std::string::npos, "docx: italic becomes a Word run property");
+    r.check(docx.find("<w:t xml:space=\"preserve\">sehr</w:t>") != std::string::npos,
+            "docx: emphasis characters are not part of the text");
+    r.check(docx.find("<w:jc w:val=\"center\"/>") != std::string::npos,
+            "docx: scene break centred");
     r.check(docx.find("<w:pStyle w:val=\"Title\"/>") != std::string::npos &&
                 docx.find("Meine Geschichte") != std::string::npos,
             "docx: project name as the title");
@@ -560,9 +625,12 @@ int createDemoProject(const std::string& vaultPath) {
         "hatte die Ruhe von jemandem, der lange unterwegs war.\n\n"
         "## Kapitel 2 - Der Fund\n"
         "#Tag 5, 14:00\n"
-        "In der Ruine lag das @Sword, halb im Staub. Es glomm schwach, als @Alice es aufhob.\n\n"
+        "In der Ruine lag das @Sword, halb im Staub. Es glomm **schwach**, als @Alice es "
+        "aufhob.\n\n"
+        "---\n\n"
         "#Tag 11, 08:00\n"
-        "Ein Jahr aelter, @Alice.age nun, stand sie wieder vor der @Castle.\n";
+        "Ein Jahr aelter, @Alice.age nun, stand sie wieder vor der @Castle. *Diesmal blieb "
+        "sie.*\n";
 
     return vault::saveAll(p, &err) ? 0 : 1;
 }
@@ -577,6 +645,7 @@ int runSelfTest(const std::string& reportPath) {
     testVaultRoundTrip(r);
     testLegacyConnections(r);
     testManuscript(r);
+    testManuscriptFormatting(r);
     testWordExport(r);
     r.os << "---------------------\n"
          << r.passed << " ok, " << r.failed << " fehlgeschlagen\n";

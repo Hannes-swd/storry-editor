@@ -70,7 +70,15 @@ public:
     void markConnections();
     void markMetadata();
     void markManuscript();
-    void flushSaves();
+
+    // Schreibt faellige Aenderungen in den Vault. Ohne `force` wird gewartet,
+    // bis der Benutzer kurz nicht mehr tippt - sonst laege bei jedem Anschlag
+    // eine ganze Datei neu auf der Platte. Steht "Automatisch speichern" aus,
+    // passiert ohne `force` gar nichts.
+    void flushSaves(bool force = false);
+
+    // Gibt es Aenderungen, die noch nicht im Vault stehen?
+    bool hasUnsavedChanges() const;
 
     void select(SelKind kind, const std::string& id);
     void setStatus(const std::string& text, bool error = false);
@@ -88,6 +96,8 @@ private:
         nlohmann::json state;
     };
 
+    void touchDirty();
+
     std::deque<UndoEntry> undoStack_;
     std::deque<UndoEntry> redoStack_;
     std::set<std::string> dirtyElements_;
@@ -96,6 +106,8 @@ private:
     bool dirtyMetadata_ = false;
     bool dirtyManuscript_ = false;
     bool dirtyAll_ = false;
+    float saveDelay_ = 0.0f;   // Restzeit bis zum naechsten automatischen Schreiben
+    float sinceDirty_ = 0.0f;  // wie lange schon etwas aussteht
     std::string status_;
     bool statusError_ = false;
     float statusTimer_ = 0.0f;

@@ -15,6 +15,8 @@ class Editor;
 namespace ui {
 
 void colorDot(const ImVec4& color, float radius = 5.0f);
+// Senkrechter Strich zwischen zwei Gruppen einer Werkzeugleiste.
+void verticalSeparator();
 void helpMarker(const char* text);
 void textSecondary(const char* text);
 void tooltip(const char* text);

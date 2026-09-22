@@ -1,253 +1,165 @@
-# Story Editor
+<div align="center">
 
-*[Deutsche Fassung: README.md](README.md)*
+# 📖 Story Editor
 
-Writing management software for complex stories – C++17 + Dear ImGui (Win32/DirectX 11),
-storing everything in an Obsidian vault (Markdown + JSON).
+**Writing software for big stories.**
+You write – the program remembers who was where and when, how old somebody currently is
+and what has already happened.
 
-Implementation of the specification in `claude.md` (German).
+[<kbd> &nbsp; 🚀 &nbsp; Get started &nbsp; </kbd>](docs/en/01-getting-started.md)
+[<kbd> &nbsp; ✍️ &nbsp; Learn to write &nbsp; </kbd>](docs/en/03-manuscript.md)
+[<kbd> &nbsp; 🗺️ &nbsp; All chapters &nbsp; </kbd>](#-handbook)
+[<kbd> &nbsp; 🇩🇪 &nbsp; Deutsch &nbsp; </kbd>](README.md)
 
-## Building
+<br>
 
-Requirements: Visual Studio 2022 (MSVC), CMake ≥ 3.20, internet access on the first configure
-(ImGui, nlohmann/json and stb_image are fetched automatically).
+![The program window](docs/bilder/ueberblick.png)
+
+</div>
+
+---
+
+## 🤔 What is this for?
+
+In a long story you eventually lose track:
+
+> *Was Alice actually 28 already in chapter 12?
+> Did Bob even know about the sword at that point?
+> And where was the dragon when the castle was attacked?*
+
+Story Editor answers questions like these **while you write**. You type your text
+normally; wherever a character appears, you insert them with a click. From that the
+program builds a timeline, a character database and a relationship net in the
+background.
+
+```
+             You write                          The program builds
+   ┌────────────────────────────────┐        ┌──────────────────────────────┐
+   │  "@Alice was @Alice.age        │        │  📅 timeline                 │
+   │   years old by then."          │  ───▶  │  👥 characters with values   │
+   │                                │        │  🔗 relationships            │
+   │  #Day 11, 08:00                │        │  📋 list of events           │
+   └────────────────────────────────┘        └──────────────────────────────┘
+              one text                         everything else follows
+```
+
+Everything is stored as **readable Markdown files in an Obsidian vault** – no secret
+file format, no cloud account, and versionable with Git.
+
+---
+
+## ⚡ Up and running in 5 minutes
 
 ```sh
+# 1. Build (once; needs Visual Studio 2022 + CMake)
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
+
+# 2. Create a sample project to play with
+./build/bin/StoryEditor.exe --demo C:/Temp/MyDemo
+
+# 3. Start and open that folder (File → Open project…)
 ./build/bin/StoryEditor.exe
 ```
 
-Command line:
+Step by step, with every step explained, in
+**[Chapter 1 · Getting started](docs/en/01-getting-started.md)**.
 
-| Call | Effect |
-| --- | --- |
-| `StoryEditor.exe` | normal GUI, reopens the last project |
-| `StoryEditor.exe --selftest` | checks time logic, templates, mutations, markdown and vault round trip (43 checks), exit code 0 = everything fine |
-| `StoryEditor.exe --demo <folder>` | creates a demo project (Alice, Bob, Castle, Sword, actions, connections) |
+---
 
-## Language
+## 📚 Handbook
 
-The interface ships in **German and English**. Switch it under **View → Language / Sprache** or
-in **Settings → Colours**. On the very first start the Windows display language decides; after
-that the choice is kept in `settings.json`.
+Every chapter is its own page. Start at the top left and work your way through –
+or jump straight to what you need.
 
-The language also covers the generated texts: time stamps (`Day 5, 14:00` / `Tag 5, 14:00`),
-durations, and the section headings inside the element `.md` files. Both spellings are always
-accepted when reading, so switching the language never breaks an existing vault.
+### To begin with
 
-## Windows
+| | |
+|:--|:--|
+| **[📦 1 · Getting started](docs/en/01-getting-started.md)**<br>Build, start, create your first project. What is a "vault"? | **[🪟 2 · The program window](docs/en/02-overview.md)**<br>What each window does, how to move them, how to bring a closed one back. |
+| **[✍️ 3 · Writing](docs/en/03-manuscript.md)**<br>The heart of it. Type text, insert characters, chapters, bold/italic, find & replace. | **[👥 4 · Characters, places, things](docs/en/04-groups.md)**<br>Create groups and elements, templates and field types. |
 
-| Window | Spec | Content |
-| --- | --- | --- |
-| **Manuscript** | - | Writing surface with clickable markers, outline, read mode, "action from paragraph", Word export |
-| **Timeline** | 3.1 | Tracks per group/element, events as dots, non-linear time scale (dense areas stretched, empty stretches compressed and marked "~ 5 days"), hover tooltip, click, context menu, drag & drop with ghost preview, double click = new action, Ctrl+wheel = zoom, filters by group/type/element/time window, resizable track title column |
-| **Group manager** | 3.2 | Hierarchy tree with colours, drag & drop, context menus, template editor with field dialog (9 field types, required fields, defaults, enum options), inheritance to subgroups |
-| **Details** | 3.1.7 / 3.2.3 | Detail panel for element, action, group or connection – fields editable inline, value history over time, relations, linked actions |
-| **Actions** | 3.5 | Table with sorting, filters (involved, type, tag, period, full text), expandable detail rows, live sync with the timeline |
-| **Story visualizer** | 3.3 | Read-only chronicle: day headings, "… pass" gaps, attribute changes, filters by element/storyline/importance |
-| **Connections** | 3.4 | Network graph, draggable nodes, edges with type label and arrow, blocks (grouped connections), focus on one element with degree 1–3, type filter |
-| **File manager** | 3.6 | Structured view (groups → files) and the raw vault, upload (dialog or drag & drop from Explorer), rename/move/delete, image preview, link a file to an element |
-| **Settings** | 2.3 / 7.1 | Language, theme (light/dark), every colour of the scheme, group colours, timeline parameters, management of the custom lists; stored in `%APPDATA%/StoryEditor/settings.json` |
+### The time system
 
-Window layout: Blender-style docking (ImGui dockspace, multi-viewport – windows can be pulled out
-of the main window). Positions and sizes live in `%APPDATA%/StoryEditor/imgui_layout_v2.ini`,
-visible windows in `settings.json`.
+| | |
+|:--|:--|
+| **[⏳ 5 · How time works](docs/en/05-time.md)**<br>The single most important idea in the program. Do read this one. | **[⚡ 6 · Events & value changes](docs/en/06-actions.md)**<br>Create actions, make ages count up, change states. |
+| **[📅 7 · The timeline](docs/en/07-timeline.md)**<br>Everything on one time axis: tracks, zoom, dragging, filters. | **[🔗 8 · Relationships](docs/en/08-connections.md)**<br>Who is married to whom, who is where – with templates you define. |
 
-## Theme
+### Reading, exporting, configuring
 
-Two built-in colour worlds, switchable under **View → Theme** or **Settings → Colours**:
+| | |
+|:--|:--|
+| **[📜 9 · Chronicle & detail panel](docs/en/09-chronicle.md)**<br>Read the story as a narrative; see everything about a single element. | **[💾 10 · Files, images & export](docs/en/10-files.md)**<br>Add images, produce a Word file, read on in Obsidian. |
+| **[⚙️ 11 · Settings & controls](docs/en/11-settings.md)**<br>Theme, language, your own lists, keyboard shortcuts, saving & undo. | **[🔧 12 · Under the hood](docs/en/12-internals.md)**<br>For the curious and for developers: file format, source code, self test, limits. |
 
-- **Light** (default): paper white surfaces, dark text, graphite accent
-- **Dark**: neutral dark grey with white text
+---
 
-Neither has a blue cast – the accent is a grey tone in both. Interactive surfaces (buttons, tabs,
-headers) are mixed from the panel and accent colour, which keeps the text readable in both
-themes. The automatically assigned group colours adapt their saturation and brightness.
+## 🧭 The four building blocks
 
-Every single colour can be adjusted below; **Reload theme** restores the selected preset.
+If you take only one thing away from this handbook, take these four terms –
+everything else builds on them:
 
-## The manuscript
-
-This is where you write - the text is the point, the structure falls out of it. Short markers in
-the text are clickable variables while writing and become values when reading:
-
-| Marker | Meaning |
-| --- | --- |
-| `@Alice` | reference to an element; shows the name, click opens the details |
-| `@Alice.age` | value of that field **at this point in the story** (mutations applied) |
-| `@Characters/Main/Alice` | full path when two elements share a name |
-| `#Day 5, 14:00` | from here on this point in time applies |
-| `## Chapter 1` | heading, shows up in the outline |
-| `!act:…` | linked action - typed as `!` or via "Place action"; **invisible** in the finished text, purely organisational |
-
-The markers are visible while you write: each gets a coloured underline in its group's colour -
-a reference to a name that does not exist turns **red**, so a typo stands out at once.
-
-Typing `@` (elements) or `!` (actions) suggests matching entries right below the cursor.
-**Enter** accepts the suggestion, the **arrow keys** choose, **Esc** closes the list; **Tab**
-always accepts. Enter still starts a new paragraph as long as nothing was picked - so after a
-sentence ending like "... in front of the @Castle." you simply get the next line.
-
-**"Action from paragraph"** turns the
-paragraph at the cursor into an action: title from the first sentence, time from the last time
-marker, involved elements from the `@` references in that paragraph - so the timeline fills up
-while you write instead of through forms.
-
-Time and action markers are **never** part of the finished text - they only control which
-values apply and where an action belongs. While reading they can be shown via "Show
-markers".
-
-**Read** shows the same text without markers: names inserted, values resolved, actions as links.
-Both are saved - `Manuscript/manuscript.md` with the markers and `Manuscript/gelesen.md` as the
-finished reading text for Obsidian.
-
-### Exporting as a Word file
-
-"As Word" in the manuscript bar - or *File -> Manuscript as Word (.docx)...* - writes exactly
-that finished text as a `.docx`: values baked in, time and action markers left out. The project
-name becomes the title, `## Chapter` becomes a Word heading, blank lines separate paragraphs.
-No Word installation is needed to produce it - the program builds the package itself.
-
-## Connections: your own templates with roles
-
-The program knows no built-in notions like "person" or "place" - connections are defined by you
-too. Under **Connections → "Manage types…"** you create a template:
+| Block | What it is | Example | Chapter |
+|:--|:--|:--|:--|
+| 🧩 **Element** | A thing in your world. Has fields with values. | Alice, the castle, the sword | [4](docs/en/04-groups.md) |
+| ⏳ **Point in time** | Where in the story you currently are. Stays put until you move it. | "Day 11, 08:00" | [5](docs/en/05-time.md) |
+| ⚡ **Action** | Something happens. May change values of elements. | "Alice's birthday" changes `age: 27 → 28` | [6](docs/en/06-actions.md) |
+| 🔗 **Connection** | A state that holds for a while. | "Alice is at place: Castle" from day 1 | [8](docs/en/08-connections.md) |
 
 ```
-Name:     person at place
-Role 1:   Person  →  group Characters   (or "all groups")
-Role 2:   Place   →  group Locations
-          any number of further roles
-
-[x] Can be set on the timeline (temporal)
-    [x] only one at a time per element
-    [x] draw a band in the timeline
-    Band runs in the track of: Person    Labelled with: Place
+                        ┌──────────────┐
+                        │   ELEMENT    │   Alice
+                        │  name, age…  │   age = 27
+                        └──────┬───────┘
+                               │
+            ┌──────────────────┼──────────────────┐
+            │                  │                  │
+     ┌──────▼──────┐    ┌──────▼──────┐    ┌──────▼───────┐
+     │   ACTION    │    │ CONNECTION  │    │  MANUSCRIPT  │
+     │  Birthday   │    │ at place:   │    │  "@Alice is  │
+     │  Day 11     │    │ Castle      │    │  @Alice.age" │
+     │ age 27 → 28 │    │ from day 1  │    │              │
+     └─────────────┘    └─────────────┘    └──────┬───────┘
+            │                  │                  │
+            └──────────────────┴──────────────────┘
+                               │
+                    from day 11 on, age = 28
+                    — everywhere at the same time
 ```
 
-Each role only offers elements from its allowed groups. **Temporal** types have a "from" and an
-optional "until"; with **exclusive** types the previous setting ends automatically when a new one
-starts - that is a whereabouts feature without the program ever knowing the word "place".
+---
 
-It shows up in three places:
+## 💡 What makes it different
 
-- **Timeline:** a coloured band behind the track, labelled with the other end
-  (`▓ Castle ▓│▓ Forest ▓│▓ Castle →`). Right click a track to set a new connection, click the
-  band to select it. **"Bands"** toggles types on and off.
-- **Connections graph:** each circle shows what currently applies (`person at place: Castle`).
-  Types with more than two roles are drawn as a star with a hub. At the bottom sits the collapsible
-  **timeline**: collapsed all connections apply, expanded only those valid on the chosen day
-  (with step buttons and a "5 / 7" counter).
-- **Details:** roles, period and the elements of the selected connection.
+| | |
+|:--|:--|
+| **No built-in vocabulary** | The program knows no "person" or "place". You decide which groups exist and which fields they have. → [Chapter 4](docs/en/04-groups.md) |
+| **Values know about time** | `@Alice.age` means 27 in chapter 1 and 28 in chapter 9 – in the same text, without you editing anything. → [Chapter 5](docs/en/05-time.md) |
+| **Structure falls out of writing** | Write a paragraph, turn it into an event with one click. The timeline fills up while you write, not through forms. → [Chapter 6](docs/en/06-actions.md) |
+| **Your files stay yours** | Everything lives as Markdown + JSON in a folder. Read it in Obsidian, version it with Git. → [Chapter 12](docs/en/12-internals.md) |
+| **Bilingual** | The whole interface exists in German and English, switchable while running. → [Chapter 11](docs/en/11-settings.md) |
 
-Projects from an older version keep loading: the former free-text `type` becomes a type with two
-roles, `source`/`target` become those roles, and date fields are parsed.
+---
 
-## Custom entries instead of fixed choices
+## 🛠️ Technical summary
 
-Wherever a dropdown offers a list, the defaults are only a starting point – every dropdown has a
-**"Custom entry"** field at the bottom (Enter or `+`). The entry is applied immediately and
-stored in `metadata.json`:
+| | |
+|:--|:--|
+| **Language** | C++17 |
+| **UI** | [Dear ImGui](https://github.com/ocornut/imgui) (immediate mode GUI) |
+| **Platform** | Windows, Win32 + DirectX 11 |
+| **Storage** | Obsidian vault: Markdown files + JSON |
+| **Dependencies** | ImGui, nlohmann/json, stb_image – fetched automatically by CMake |
+| **Tests** | `StoryEditor.exe --selftest` – 122 checks, exit code 0 = all good |
 
-| Place | List |
-| --- | --- |
-| Action dialog → Type | action types (Dialogue, Action, … + your own) |
-| Action dialog → Storyline | storylines |
-| Action dialog → Tags | free text, `Existing…` offers tags already in use |
-| Action dialog → Mutations → Field | a new field name creates the field on the element |
-| Connection dialog → Type | connection types (your own templates with roles, see above) |
-| Connection dialog → Block | a new name creates the block |
-| Element fields of type Enum | a new option lands in the template of the defining group |
-| Template editor → Field | field name, description and enum options are free anyway |
+The full requirements specification this was built from is in [`claude.md`](claude.md)
+(German).
 
-The lists are managed under **Settings → Custom lists**: each entry shows how often it is used,
-renaming carries every usage along, deleting reassigns them. Values that appear in the data but
-are missing from a list are added back automatically on load. Only the nine field data types
-(Text, Integer, …) and the time units are fixed in code.
+---
 
-## Keyboard shortcuts
+<div align="center">
 
-`Ctrl+N` new element · `Ctrl+Shift+N` new project · `Ctrl+G` new group · `Ctrl+T` new action ·
-`Ctrl+S` save · `Ctrl+Z`/`Ctrl+Y` undo/redo · `Ctrl+wheel` zoom the timeline · `Shift+wheel`
-scroll sideways.
+[<kbd> &nbsp; 🚀 &nbsp; On to chapter 1 · Getting started &nbsp; </kbd>](docs/en/01-getting-started.md)
 
-## Storage (Obsidian vault)
-
-```
-MyStory/
-├── metadata.json                     project, groups, templates, colours, graph positions
-├── Characters/Main/Alice.md          one element = one .md file
-├── Locations/Castle.md
-├── Objects/Sword.md
-├── Actions/actions.json              actions including mutations, tags, attachments
-├── Connections/relationships.json    connections and blocks
-├── Timeline/events.md                generated reading overview for Obsidian
-└── Assets/Images, Assets/Documents   uploaded files
-```
-
-Element file:
-
-```markdown
-# Alice
-
-<!-- story-editor: id=el_...; group=Characters/Main -->
-> This file is managed by Story Editor. Please edit it through the UI only.
-
-## Fields
-- name: Alice
-- age: 27
-- description: A brave knight.
-
-## Text
-Free text
-
-## Relations
-- married_to -> [[Bob]]
-
-## Linked actions
-- Day 5, 14:00 - Alice finds the sword
-```
-
-`## Relations` and `## Linked actions` are generated from actions/relationships; only `## Fields`
-and `## Text` are read back. German section names (`## Felder`, `## Beziehungen`,
-`## Verknuepfte Aktionen`) are accepted as well.
-
-**.md files are written by the program only.** A file watcher detects external changes and asks
-with **Reload / Merge / Cancel** (reload = the file wins, merge = take external field values and
-keep additional program fields, cancel = write the program data back).
-
-## Time model
-
-Time is stored as minutes since the start of the story; the fictional calendar uses 30-day months
-and 12-month years. Input like `Day 5, 14:30`, `Tag 5, 14:30`, `Year 2, month 3, day 15` or
-`14:30` is understood, and actions can be placed relative to another action ("120 minutes
-after …").
-
-Attribute changes (mutations) hang off actions: `Alice.age: 27 → 28`. The value of a field at a
-point in time is the base value plus every mutation up to then (`Project::valueAt`), shown in the
-detail panel and in the story visualizer.
-
-## Saving & undo
-
-Everything is saved automatically after each change (can be turned off under View → Autosave).
-Undo/redo works on snapshots of the whole project (64 steps) and writes the restored state
-straight into the vault.
-
-## Source layout
-
-```
-src/core     data model, time logic, vault I/O (markdown+json), file watcher, self test
-src/app      Win32/DX11 host, platform helpers (dialogs, unicode paths), texture cache
-src/ui       editor state (undo, selection, save queue), theme, language, dialogs, windows
-```
-
-Colours come exclusively from `ColorScheme` (`src/ui/Theme.h`) and the group colours – no
-hardcoded RGB values in the windows. UI texts go through `TR("...")` with the German string as
-the key; the table lives in `src/ui/Lang.cpp`.
-
-## Known limits
-
-- The backend is Win32/DirectX 11 (no Linux/macOS port).
-- Markdown is shown as raw text in the file manager, not rendered.
-- No plugin system (phase 3 of the specification).
+</div>

@@ -27,6 +27,19 @@ void colorDot(const ImVec4& color, float radius) {
     ImGui::SameLine();
 }
 
+// Werkzeugleisten werden unlesbar, wenn alle Knoepfe gleich weit auseinander
+// stehen. Der Strich trennt, was inhaltlich zusammengehoert.
+void verticalSeparator() {
+    const float h = ImGui::GetFrameHeight();
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    const float x = pos.x + 4.0f;
+    ImGui::GetWindowDrawList()->AddLine(
+        ImVec2(x, pos.y + 2.0f), ImVec2(x, pos.y + h - 2.0f),
+        theme::u32(theme::withAlpha(theme::colors().textSecondary, 0.45f)), 1.0f);
+    ImGui::Dummy(ImVec2(9.0f, h));
+    ImGui::SameLine();
+}
+
 void helpMarker(const char* text) {
     ImGui::TextDisabled(TR("(?)"));
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {

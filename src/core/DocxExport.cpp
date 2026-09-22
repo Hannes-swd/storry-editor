@@ -157,11 +157,22 @@ std::string isoNow() {
     return buf;
 }
 
-// Ein Absatz: entweder Ueberschrift oder Fliesstext. Zeilenumbrueche innerhalb
-// eines Absatzes bleiben als weiche Umbrueche erhalten.
+// Ein Textstueck mit gleichbleibender Auszeichnung. "**fett**" und "*kursiv*"
+// aus dem Manuskript werden hier zu echten Word-Attributen.
+struct Run {
+    std::string text;
+    bool bold = false;
+    bool italic = false;
+    bool lineBreak = false;  // weicher Umbruch vor diesem Stueck
+};
+
+// Ein Absatz: Ueberschrift, Szenenwechsel oder Fliesstext.
 struct Para {
+    enum class Kind { Body, Heading, SceneBreak };
+
+    Kind kind = Kind::Body;
     int headingLevel = 0;
-    std::vector<std::string> lines;
+    std::vector<Run> runs;
 };
 
 std::string trimmed(const std::string& line) {
@@ -171,11 +182,59 @@ std::string trimmed(const std::string& line) {
     return line.substr(b, e - b + 1);
 }
 
+bool isSceneBreak(const std::string& line) {
+    if (line.size() < 3) return false;
+    for (char c : line) {
+        if (c != '-') return false;
+    }
+    return true;
+}
+
+// Zerlegt eine Zeile an den Sternchen. Die Zeichen selbst wandern nicht in den
+// Text - sie werden zu fett/kursiv.
+void appendRuns(std::vector<Run>& runs, const std::string& line, bool firstLineOfPara) {
+    bool bold = false;
+    bool italic = false;
+    std::string current;
+    bool pendingBreak = !firstLineOfPara;
+
+    auto flush = [&]() {
+        if (current.empty()) return;
+        Run r;
+        r.text = current;
+        r.bold = bold;
+        r.italic = italic;
+        r.lineBreak = pendingBreak;
+        runs.push_back(r);
+        pendingBreak = false;
+        current.clear();
+    };
+
+    for (size_t i = 0; i < line.size(); ++i) {
+        if (line[i] == '*') {
+            const bool doubleMark = i + 1 < line.size() && line[i + 1] == '*';
+            flush();
+            if (doubleMark) {
+                bold = !bold;
+                ++i;
+            } else {
+                italic = !italic;
+            }
+            continue;
+        }
+        current += line[i];
+    }
+    flush();
+    // Eine Zeile, die nur aus Auszeichnung bestand, darf den weichen Umbruch
+    // nicht verschlucken.
+    if (pendingBreak && !runs.empty()) runs.back().lineBreak = true;
+}
+
 std::vector<Para> splitParagraphs(const std::string& text) {
     std::vector<Para> paras;
     Para current;
     auto flush = [&]() {
-        if (!current.lines.empty()) paras.push_back(current);
+        if (!current.runs.empty()) paras.push_back(current);
         current = Para();
     };
 
@@ -188,6 +247,14 @@ std::vector<Para> splitParagraphs(const std::string& text) {
 
         if (line.empty()) {
             flush();  // Leerzeile trennt Absaetze
+        } else if (isSceneBreak(line)) {
+            flush();
+            Para b;
+            b.kind = Para::Kind::SceneBreak;
+            Run r;
+            r.text = "* * *";
+            b.runs.push_back(r);
+            paras.push_back(b);
         } else if (line[0] == '#') {
             flush();
             int level = 0;
@@ -200,11 +267,12 @@ std::vector<Para> splitParagraphs(const std::string& text) {
             // Im Manuskript ist "## Kapitel" die oberste Ueberschrift, darum
             // wird ein Rautenzeichen abgezogen.
             Para h;
+            h.kind = Para::Kind::Heading;
             h.headingLevel = level >= 3 ? 2 : 1;
-            h.lines.push_back(line.substr(k));
-            if (!h.lines.front().empty()) paras.push_back(h);
+            appendRuns(h.runs, line.substr(k), true);
+            if (!h.runs.empty()) paras.push_back(h);
         } else {
-            current.lines.push_back(line);
+            appendRuns(current.runs, line, current.runs.empty());
         }
 
         if (last) break;
@@ -216,15 +284,27 @@ std::vector<Para> splitParagraphs(const std::string& text) {
 
 std::string paragraphXml(const Para& para) {
     std::string out = "<w:p>";
-    if (para.headingLevel > 0)
+    if (para.kind == Para::Kind::Heading)
         out += "<w:pPr><w:pStyle w:val=\"Heading" + std::to_string(para.headingLevel) +
                "\"/></w:pPr>";
-    out += "<w:r>";
-    for (size_t i = 0; i < para.lines.size(); ++i) {
-        if (i > 0) out += "<w:br/>";
-        out += "<w:t xml:space=\"preserve\">" + xmlEscape(para.lines[i]) + "</w:t>";
+    else if (para.kind == Para::Kind::SceneBreak)
+        out += "<w:pPr><w:jc w:val=\"center\"/><w:spacing w:before=\"240\" w:after=\"240\"/>"
+               "</w:pPr>";
+
+    for (const Run& run : para.runs) {
+        out += "<w:r>";
+        if (run.bold || run.italic) {
+            out += "<w:rPr>";
+            if (run.bold) out += "<w:b/>";
+            if (run.italic) out += "<w:i/>";
+            out += "</w:rPr>";
+        }
+        if (run.lineBreak) out += "<w:br/>";
+        out += "<w:t xml:space=\"preserve\">" + xmlEscape(run.text) + "</w:t>";
+        out += "</w:r>";
     }
-    out += "</w:r></w:p>";
+    if (para.runs.empty()) out += "<w:r/>";
+    out += "</w:p>";
     return out;
 }
 
@@ -284,8 +364,10 @@ const char* kStyles =
 }  // namespace
 
 std::string buildManuscriptDocx(const Project& p, const std::string& title) {
-    // renderManuscript setzt die Werte ein und laesst Zeit- und Aktionsmarken weg.
-    const std::string rendered = renderManuscript(p, p.manuscript);
+    // renderManuscript setzt die Werte ein und laesst Zeit- und Aktionsmarken
+    // weg. Die Auszeichnung bleibt stehen und wird unten zu echtem Word-Fett
+    // bzw. -Kursiv.
+    const std::string rendered = renderManuscript(p, p.manuscript, /*keepFormatting=*/true);
 
     std::string body;
     if (!title.empty())

@@ -1,5 +1,6 @@
 #include "core/Manuscript.h"
 
+#include <algorithm>
 #include <cctype>
 
 #include "core/StoryTime.h"
@@ -17,6 +18,8 @@ bool atLineStart(const std::string& text, size_t pos) {
     return text[pos - 1] == '\n';
 }
 
+char lower(char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+
 // "Alice" oder "Characters/Main/Alice" -> Element-ID
 std::string resolveElement(const Project& p, const std::string& reference) {
     if (reference.empty()) return std::string();
@@ -29,12 +32,57 @@ std::string resolveElement(const Project& p, const std::string& reference) {
     return std::string();
 }
 
+// Ende des Absatzes, in dem `from` liegt. Hervorhebungen gelten nie ueber eine
+// Leerzeile hinweg - so faerbt ein vergessenes Sternchen nicht den Rest des
+// Buches ein.
+size_t paragraphEnd(const std::string& text, size_t from) {
+    size_t i = from;
+    while (i + 1 < text.size()) {
+        if (text[i] == '\n' && text[i + 1] == '\n') return i;
+        ++i;
+    }
+    return text.size();
+}
+
+// Gibt es im selben Absatz ein passendes Schlusszeichen? Nur dann ist das
+// Sternchen eine Hervorhebung und kein normales Satzzeichen.
+bool hasClosingMark(const std::string& text, size_t after, size_t markLength) {
+    const size_t stop = paragraphEnd(text, after);
+    for (size_t i = after; i + markLength <= stop; ++i) {
+        if (text[i] != '*') continue;
+        const bool doubleMark = i + 1 < text.size() && text[i + 1] == '*';
+        if (markLength == 2 && !doubleMark) continue;
+        if (markLength == 1 && doubleMark) {
+            ++i;  // "**" ist hier kein Ende fuer ein einfaches Sternchen
+            continue;
+        }
+        // Ein Schlusszeichen klebt am Wort: " *" waere ein neuer Anfang.
+        if (i > after && text[i - 1] != ' ' && text[i - 1] != '\n') return true;
+    }
+    return false;
+}
+
+// Eine Zeile, die nur aus Strichen besteht, trennt zwei Szenen.
+bool isSceneBreakLine(const std::string& text, size_t lineBegin, size_t lineEnd) {
+    size_t dashes = 0;
+    for (size_t i = lineBegin; i < lineEnd; ++i) {
+        const char c = text[i];
+        if (c == '-')
+            ++dashes;
+        else if (c != ' ' && c != '\t' && c != '\r')
+            return false;
+    }
+    return dashes >= 3;
+}
+
 }  // namespace
 
 std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string& text) {
     std::vector<ManuscriptToken> out;
     long long currentTime = 0;
     size_t textStart = 0;
+    bool bold = false;
+    bool italic = false;
 
     auto flushText = [&](size_t upTo) {
         if (upTo <= textStart) return;
@@ -44,6 +92,8 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
         t.end = upTo;
         t.raw = text.substr(textStart, upTo - textStart);
         t.time = currentTime;
+        t.bold = bold;
+        t.italic = italic;
         out.push_back(t);
     };
 
@@ -65,9 +115,31 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
             t.time = currentTime;
             t.resolved = true;
             out.push_back(t);
+            bold = italic = false;  // eine Ueberschrift beendet jede Hervorhebung
             i = lineEnd;
             textStart = i;
             continue;
+        }
+
+        // ---------------------------------------------------- Szenenwechsel
+        if (c == '-' && atLineStart(text, i)) {
+            size_t lineEnd = text.find('\n', i);
+            if (lineEnd == std::string::npos) lineEnd = text.size();
+            if (isSceneBreakLine(text, i, lineEnd)) {
+                flushText(i);
+                ManuscriptToken t;
+                t.kind = ManuscriptToken::Kind::Break;
+                t.begin = i;
+                t.end = lineEnd;
+                t.raw = text.substr(i, lineEnd - i);
+                t.time = currentTime;
+                t.resolved = true;
+                out.push_back(t);
+                bold = italic = false;
+                i = lineEnd;
+                textStart = i;
+                continue;
+            }
         }
 
         // ---------------------------------------------------- Zeitmarke
@@ -113,6 +185,25 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
             continue;
         }
 
+        // ---------------------------------------------------- Hervorhebung
+        if (c == '*') {
+            const size_t length = (i + 1 < text.size() && text[i + 1] == '*') ? 2 : 1;
+            bool& flag = length == 2 ? bold : italic;
+            const bool closing = flag;
+            // Aufmachen nur, wenn direkt ein Wort folgt und der Absatz das
+            // Zeichen auch wieder schliesst.
+            const size_t after = i + length;
+            const bool opening = !flag && after < text.size() && text[after] != ' ' &&
+                                 text[after] != '\n' && hasClosingMark(text, after, length);
+            if (closing || opening) {
+                flushText(i);
+                flag = !flag;
+                i = after;
+                textStart = i;
+                continue;
+            }
+        }
+
         // ---------------------------------------------------- Element / Wert
         if (c == '@') {
             size_t j = i + 1;
@@ -130,7 +221,8 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
             if (!reference.empty()) {
                 flushText(i);
                 ManuscriptToken t;
-                t.kind = field.empty() ? ManuscriptToken::Kind::Element : ManuscriptToken::Kind::Value;
+                t.kind =
+                    field.empty() ? ManuscriptToken::Kind::Element : ManuscriptToken::Kind::Value;
                 t.begin = i;
                 t.end = j;
                 t.raw = text.substr(i, j - i);
@@ -138,11 +230,20 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
                 t.field = field;
                 t.time = currentTime;
                 t.resolved = !t.targetId.empty();
+                t.bold = bold;
+                t.italic = italic;
                 out.push_back(t);
                 i = j;
                 textStart = i;
                 continue;
             }
+        }
+
+        // Eine Leerzeile beendet jede Hervorhebung - siehe paragraphEnd().
+        if (c == '\n' && i + 1 < text.size() && text[i + 1] == '\n' && (bold || italic)) {
+            flushText(i);
+            bold = italic = false;
+            textStart = i;
         }
 
         ++i;
@@ -151,18 +252,47 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
     return out;
 }
 
-std::string renderManuscript(const Project& p, const std::string& text) {
+std::string renderManuscript(const Project& p, const std::string& text, bool keepFormatting) {
     std::string out;
+    bool bold = false;
+    bool italic = false;
+
+    // Beim Export bleiben die Formatzeichen stehen; dort werden sie in echte
+    // Word-Formatierung uebersetzt.
+    auto applyStyle = [&](const ManuscriptToken& t) {
+        if (!keepFormatting) return;
+        if (italic && !t.italic) {
+            out += "*";
+            italic = false;
+        }
+        if (bold != t.bold) {
+            out += "**";
+            bold = t.bold;
+        }
+        if (!italic && t.italic) {
+            out += "*";
+            italic = true;
+        }
+    };
+
     for (const ManuscriptToken& t : parseManuscript(p, text)) {
         switch (t.kind) {
             case ManuscriptToken::Kind::Text:
+                applyStyle(t);
+                out += t.raw;
+                break;
             case ManuscriptToken::Kind::Heading:
                 out += t.raw;
                 break;
+            case ManuscriptToken::Kind::Break:
+                out += keepFormatting ? "---" : "* * *";
+                break;
             case ManuscriptToken::Kind::Element:
+                applyStyle(t);
                 out += t.resolved ? p.displayName(t.targetId) : t.raw;
                 break;
             case ManuscriptToken::Kind::Value: {
+                applyStyle(t);
                 if (!t.resolved) {
                     out += t.raw;
                     break;
@@ -179,6 +309,10 @@ std::string renderManuscript(const Project& p, const std::string& text) {
                 // die Aktion passiert - im fertigen Text steht sie nicht.
                 break;
         }
+    }
+    if (keepFormatting) {
+        if (italic) out += "*";
+        if (bold) out += "**";
     }
     return out;
 }
@@ -236,6 +370,25 @@ size_t countWords(const std::string& text) {
         }
     }
     return words;
+}
+
+std::vector<size_t> findAll(const std::string& haystack, const std::string& needle,
+                            bool caseSensitive) {
+    std::vector<size_t> hits;
+    if (needle.empty() || needle.size() > haystack.size()) return hits;
+    for (size_t i = 0; i + needle.size() <= haystack.size(); ++i) {
+        bool same = true;
+        for (size_t k = 0; k < needle.size() && same; ++k) {
+            const char a = haystack[i + k];
+            const char b = needle[k];
+            same = caseSensitive ? a == b : lower(a) == lower(b);
+        }
+        if (same) {
+            hits.push_back(i);
+            i += needle.size() - 1;  // Treffer ueberlappen sich nicht
+        }
+    }
+    return hits;
 }
 
 }  // namespace se

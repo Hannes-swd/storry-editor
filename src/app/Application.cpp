@@ -71,17 +71,48 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
 
+// Vier Schnitte einer Familie: normal, fett, kursiv, fett-kursiv. Das
+// Manuskript zeigt Hervorhebungen damit als echte Schrift und nicht nur als
+// Sternchen. Was auf dem Rechner fehlt, bleibt einfach leer - theme::fontFor()
+// faellt dann auf die normale Schrift zurueck.
 void loadFonts() {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
     const float size = theme::settings().fontSize;
-    const char* candidates[] = {"C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf",
-                                "C:/Windows/Fonts/arial.ttf"};
-    for (const char* path : candidates) {
-        if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) continue;
-        if (io.Fonts->AddFontFromFileTTF(path, size)) return;
+
+    struct Family {
+        const char* regular;
+        const char* bold;
+        const char* italic;
+        const char* boldItalic;
+    };
+    const Family families[] = {
+        {"C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf",
+         "C:/Windows/Fonts/segoeuii.ttf", "C:/Windows/Fonts/segoeuiz.ttf"},
+        {"C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/calibrib.ttf",
+         "C:/Windows/Fonts/calibrii.ttf", "C:/Windows/Fonts/calibriz.ttf"},
+        {"C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf",
+         "C:/Windows/Fonts/ariali.ttf", "C:/Windows/Fonts/arialbi.ttf"},
+    };
+
+    auto tryLoad = [&](const char* path) -> ImFont* {
+        if (!path || GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) return nullptr;
+        return io.Fonts->AddFontFromFileTTF(path, size);
+    };
+
+    theme::Fonts& out = theme::fonts();
+    out = theme::Fonts();
+    for (const Family& family : families) {
+        ImFont* regular = tryLoad(family.regular);
+        if (!regular) continue;
+        out.regular = regular;
+        out.bold = tryLoad(family.bold);
+        out.italic = tryLoad(family.italic);
+        out.boldItalic = tryLoad(family.boldItalic);
+        io.FontDefault = regular;
+        return;
     }
-    io.Fonts->AddFontDefault();
+    out.regular = io.Fonts->AddFontDefault();
 }
 
 }  // namespace

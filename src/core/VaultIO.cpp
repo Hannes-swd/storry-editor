@@ -541,8 +541,10 @@ bool saveManuscript(const Project& p, std::string* err) {
     // Zusaetzlich eine gerenderte Fassung zum Lesen in Obsidian.
     if (!platform::writeFile(absolutePath(p, "Manuscript/manuscript.md"), p.manuscript, err))
         return false;
+    // Fett, kursiv und der Szenenwechsel bleiben als Markdown stehen - Obsidian
+    // stellt sie dann genauso dar wie der Lesemodus hier.
     return platform::writeFile(absolutePath(p, "Manuscript/gelesen.md"),
-                               renderManuscript(p, p.manuscript), err);
+                               renderManuscript(p, p.manuscript, /*keepFormatting=*/true), err);
 }
 
 bool saveElement(const Project& p, Element& el, std::string* err) {

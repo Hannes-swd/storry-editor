@@ -19,6 +19,10 @@
 namespace se {
 namespace {
 constexpr size_t kMaxUndo = 64;
+// Beim Tippen wird nicht bei jedem Anschlag geschrieben: erst wenn eine halbe
+// Sekunde Ruhe war, spaetestens aber nach fuenf Sekunden.
+constexpr float kSaveIdleDelay = 0.5f;
+constexpr float kMaxSaveDelay = 5.0f;
 }
 
 void Editor::init() {
@@ -35,7 +39,7 @@ void Editor::init() {
 }
 
 void Editor::shutdown() {
-    if (project.loaded) flushSaves();
+    if (project.loaded) flushSaves(true);
     theme::settings().lastVault = project.vaultPath;
     theme::settings().lastProjectName = project.name;
     theme::save();
@@ -43,6 +47,8 @@ void Editor::shutdown() {
 
 void Editor::newFrame(float dt) {
     if (statusTimer_ > 0.0f) statusTimer_ -= dt;
+    if (saveDelay_ > 0.0f) saveDelay_ -= dt;
+    if (hasUnsavedChanges()) sinceDirty_ += dt;
 
     if (project.loaded) {
         std::vector<ExternalChange> changes = watcher.poll(project, dt);
@@ -79,7 +85,7 @@ void Editor::undo() {
     redoStack_.push_back({entry.label, vault::snapshot(project)});
     vault::restore(entry.state, project);
     dirtyAll_ = true;
-    flushSaves();
+    flushSaves(true);
     watcher.reset(project);
     setStatus(TR("Rueckgaengig: ") + entry.label);
 }
@@ -91,32 +97,64 @@ void Editor::redo() {
     undoStack_.push_back({entry.label, vault::snapshot(project)});
     vault::restore(entry.state, project);
     dirtyAll_ = true;
-    flushSaves();
+    flushSaves(true);
     watcher.reset(project);
     setStatus(TR("Wiederholt: ") + entry.label);
 }
 
+// Jede Aenderung stellt die Uhr neu: geschrieben wird erst, wenn eine kurze
+// Pause entsteht (oder spaetestens nach kMaxSaveDelay).
+void Editor::touchDirty() {
+    saveDelay_ = kSaveIdleDelay;
+}
+
+bool Editor::hasUnsavedChanges() const {
+    return dirtyAll_ || dirtyActions_ || dirtyConnections_ || dirtyMetadata_ ||
+           dirtyManuscript_ || !dirtyElements_.empty();
+}
+
 void Editor::markElement(const std::string& id) {
+    touchDirty();
     dirtyElements_.insert(id);
     dirtyActions_ = true;  // linked-event lists inside other files may change
 }
-void Editor::markAllElements() { dirtyAll_ = true; }
+void Editor::markAllElements() {
+    touchDirty();
+    dirtyAll_ = true;
+}
 void Editor::markActions() {
+    touchDirty();
     dirtyActions_ = true;
     dirtyAll_ = true;  // element files list their linked actions
 }
 void Editor::markConnections() {
+    touchDirty();
     dirtyConnections_ = true;
     dirtyAll_ = true;  // element files list their relations
 }
-void Editor::markMetadata() { dirtyMetadata_ = true; }
-void Editor::markManuscript() { dirtyManuscript_ = true; }
+void Editor::markMetadata() {
+    touchDirty();
+    dirtyMetadata_ = true;
+}
+void Editor::markManuscript() {
+    touchDirty();
+    dirtyManuscript_ = true;
+}
 
-void Editor::flushSaves() {
+void Editor::flushSaves(bool force) {
     if (!project.loaded || project.vaultPath.empty()) return;
-    if (!theme::settings().autosave && !dirtyAll_ && dirtyElements_.empty() && !dirtyActions_ &&
-        !dirtyConnections_ && !dirtyMetadata_ && !dirtyManuscript_)
+    if (!hasUnsavedChanges()) {
+        sinceDirty_ = 0.0f;
         return;
+    }
+    if (!force) {
+        // Von Hand speichern heisst: nur auf Strg+S bzw. beim Schliessen.
+        if (!theme::settings().autosave) return;
+        // Beim Tippen nicht bei jedem Anschlag die Datei neu schreiben.
+        if (saveDelay_ > 0.0f && sinceDirty_ < kMaxSaveDelay) return;
+    }
+    sinceDirty_ = 0.0f;
+    saveDelay_ = 0.0f;
 
     std::string err;
     bool ok = true;
@@ -192,7 +230,7 @@ bool Editor::openProject(const std::string& folder) {
 }
 
 void Editor::closeProject() {
-    flushSaves();
+    flushSaves(true);
     project.clear();
     undoStack_.clear();
     redoStack_.clear();
@@ -207,6 +245,16 @@ void Editor::saveEverything() {
     std::string err;
     if (vault::saveAll(project, &err)) {
         for (const Element& el : project.elements) watcher.touch(project, el);
+        // Alles steht auf der Platte - die Merker duerfen weg, sonst zeigt die
+        // Oberflaeche weiter "nicht gespeichert" an.
+        dirtyAll_ = false;
+        dirtyMetadata_ = false;
+        dirtyActions_ = false;
+        dirtyConnections_ = false;
+        dirtyManuscript_ = false;
+        dirtyElements_.clear();
+        saveDelay_ = 0.0f;
+        sinceDirty_ = 0.0f;
         setStatus(TR("Gespeichert nach ") + project.vaultPath);
     } else {
         setStatus(err, true);
