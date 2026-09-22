@@ -143,6 +143,7 @@ void applyImGuiStyle() {
     s.WindowPadding = ImVec2(8, 8);
     s.FramePadding = ImVec2(7, 4);
     s.ItemSpacing = ImVec2(8, 5);
+    s.InputTextCursorSize = 2.0f;  // ein Strich Breite ist beim Schreiben zu duenn
     s.WindowTitleAlign = ImVec2(0.0f, 0.5f);
     s.WindowMenuButtonPosition = ImGuiDir_None;
 
@@ -204,6 +205,9 @@ void applyImGuiStyle() {
     col[ImGuiCol_TableRowBgAlt] = light ? withAlpha(c.textSecondary, 0.07f)
                                         : withAlpha(c.accentColor, 0.05f);
     col[ImGuiCol_TextSelectedBg] = withAlpha(c.accentColor, light ? 0.28f : 0.40f);
+    // Ohne diese Zeile bleibt der Schreibcursor auf ImGuis Vorgabe (weiss) und
+    // ist im hellen Theme unsichtbar.
+    col[ImGuiCol_InputTextCursor] = c.textPrimary;
     col[ImGuiCol_NavCursor] = c.accentColor;
     col[ImGuiCol_ModalWindowDimBg] = light ? ImVec4(0.15f, 0.15f, 0.16f, 0.35f)
                                            : ImVec4(0.0f, 0.0f, 0.0f, 0.55f);

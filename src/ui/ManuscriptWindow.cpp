@@ -31,7 +31,13 @@ struct ManuscriptState {
     char completionSigil = 0;    // '@' oder '!'
     int completionStart = -1;
     int completionPick = 0;
-    bool completionOpen = false;
+    bool completionOpen = false;   // Vorschlagsfenster stand im letzten Frame offen
+    bool pickFiltered = false;     // es wurde etwas getippt, das die Liste einengt
+    bool pickMoved = false;        // mit den Pfeilen bewusst ausgewaehlt
+    std::string pickText;          // was beim Uebernehmen eingesetzt wird
+    bool acceptRequested = false;  // Enter/Tab gedrueckt, der Callback ersetzt
+    bool muted = false;            // mit Esc weggeklickt oder gerade uebernommen
+    std::string mutedWord;         // ... und zwar fuer genau dieses Wort
     bool insertRequested = false;
     std::string insertText;
     float scrollToLine = -1.0f;
@@ -52,7 +58,22 @@ int editCallback(ImGuiInputTextCallbackData* data) {
             st.insertRequested = false;
             st.insertText.clear();
         }
+        // Vorschlag uebernehmen: das schon Getippte wird durch den Treffer
+        // ersetzt. Das muss hier passieren - am std::string vorbei wuerde die
+        // Aenderung im naechsten Frame wieder ueberschrieben.
+        if (st.acceptRequested) {
+            const int from = st.completionStart + 1;
+            if (st.completionStart >= 0 && from <= data->BufTextLen && data->CursorPos >= from) {
+                data->DeleteChars(from, data->CursorPos - from);
+                data->InsertChars(from, st.pickText.c_str());
+                st.muted = true;  // nicht sofort wieder aufklappen
+                st.mutedWord = st.pickText;
+            }
+            st.acceptRequested = false;
+            st.completionPick = 0;
+        }
         // Wort vor dem Cursor bestimmen, um "@" (Element) oder "!" (Aktion) zu erkennen
+        const std::string previousWord = st.completionWord;
         st.completionStart = -1;
         st.completionSigil = 0;
         st.completionWord.clear();
@@ -78,6 +99,14 @@ int editCallback(ImGuiInputTextCallbackData* data) {
         }
         if (st.completionSigil == '!' && st.completionWord.rfind("act:", 0) == 0)
             st.completionStart = -1;  // bereits gesetzte Marke nicht erneut anbieten
+
+        // Weitergetippt? Dann darf das Fenster wieder aufgehen, und die
+        // Auswahl faengt bei der neuen Trefferliste wieder oben an.
+        if (st.completionWord != previousWord) {
+            st.completionPick = 0;
+            st.pickMoved = false;
+            if (st.muted && st.completionWord != st.mutedWord) st.muted = false;
+        }
     }
     return 0;
 }
@@ -85,6 +114,106 @@ int editCallback(ImGuiInputTextCallbackData* data) {
 void insertAtCursor(ManuscriptState& st, const std::string& text) {
     st.insertRequested = true;
     st.insertText = text;
+}
+
+// --------------------------------------------------------------- Geometrie
+// Wo genau steht ein bestimmtes Byte im Schreibfeld? InputTextMultiline bricht
+// Zeilen nicht um, darum genuegt: Zeilennummer mal Zeilenhoehe, und als Spalte
+// die Breite des Textes davor. Damit lassen sich die Marken einfaerben und das
+// Vorschlagsfenster an den Cursor setzen.
+struct TextGeometry {
+    bool valid = false;
+    ImVec2 origin;  // linke obere Ecke der ersten Zeile, Bildschirmkoordinaten
+    float lineHeight = 0.0f;
+    ImRect clip;
+    // Das Textfeld ist ein eigenes Kindfenster mit eigener Zeichenliste. Wer in
+    // die des Elternfensters malt, landet darunter und sieht nichts.
+    ImDrawList* drawList = nullptr;
+    std::vector<size_t> lineStarts;
+};
+
+TextGeometry textGeometry(const char* label, ImGuiID id, const std::string& text) {
+    TextGeometry geo;
+    ImGuiWindow* parent = ImGui::GetCurrentWindow();
+    // InputTextMultiline legt intern ein Kindfenster an; ImGui setzt dessen
+    // Namen aus Elternname, Label und Id zusammen.
+    char name[512];
+    ImFormatString(name, IM_ARRAYSIZE(name), "%s/%s_%08X", parent->Name, label, id);
+    ImGuiWindow* inner = ImGui::FindWindowByName(name);
+    if (!inner) return geo;
+
+    const ImGuiContext& ctx = *ImGui::GetCurrentContext();
+    const float scrollX = ctx.InputTextState.ID == id ? ctx.InputTextState.Scroll.x : 0.0f;
+    const ImVec2 pad = ImGui::GetStyle().FramePadding;
+    geo.origin = ImVec2(inner->Pos.x + pad.x - scrollX, inner->Pos.y + pad.y - inner->Scroll.y);
+    geo.lineHeight = ImGui::GetTextLineHeight();
+    geo.clip = inner->InnerClipRect;
+    geo.drawList = inner->DrawList;
+    geo.lineStarts.push_back(0);
+    for (size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '\n') geo.lineStarts.push_back(i + 1);
+    }
+    geo.valid = true;
+    return geo;
+}
+
+size_t lineOfOffset(const TextGeometry& geo, size_t offset) {
+    const auto it = std::upper_bound(geo.lineStarts.begin(), geo.lineStarts.end(), offset);
+    return static_cast<size_t>(it - geo.lineStarts.begin()) - 1;
+}
+
+ImVec2 posOfOffset(const TextGeometry& geo, const std::string& text, size_t offset) {
+    offset = std::min(offset, text.size());
+    const size_t line = lineOfOffset(geo, offset);
+    const size_t start = geo.lineStarts[line];
+    const float w = ImGui::CalcTextSize(text.c_str() + start, text.c_str() + offset).x;
+    return ImVec2(geo.origin.x + w, geo.origin.y + static_cast<float>(line) * geo.lineHeight);
+}
+
+// Marken im Schreibmodus sichtbar machen: getoente Flaeche plus Unterstrich in
+// der Farbe des Ziels. Unbekannte Verweise werden rot - so faellt ein Tippfehler
+// im Namen sofort auf.
+void drawMarkHighlights(Editor& ed, const std::string& text, const TextGeometry& geo) {
+    if (!geo.valid || !geo.drawList) return;
+    ColorScheme& c = theme::colors();
+    ImDrawList* dl = geo.drawList;
+    dl->PushClipRect(geo.clip.Min, geo.clip.Max, true);
+
+    for (const ManuscriptToken& t : parseManuscript(ed.project, text)) {
+        if (t.kind == ManuscriptToken::Kind::Text) continue;
+        size_t begin = t.begin;
+        size_t end = std::min(t.end, text.size());
+        while (end > begin && (text[end - 1] == '\n' || text[end - 1] == '\r')) --end;
+        if (end <= begin) continue;
+
+        const size_t line = lineOfOffset(geo, begin);
+        const float y = geo.origin.y + static_cast<float>(line) * geo.lineHeight;
+        if (y + geo.lineHeight < geo.clip.Min.y || y > geo.clip.Max.y) continue;  // nicht sichtbar
+
+        const size_t start = geo.lineStarts[line];
+        const float x0 =
+            geo.origin.x + ImGui::CalcTextSize(text.c_str() + start, text.c_str() + begin).x;
+        const float x1 = x0 + ImGui::CalcTextSize(text.c_str() + begin, text.c_str() + end).x;
+
+        ImVec4 col = c.accentColor;
+        switch (t.kind) {
+            case ManuscriptToken::Kind::Heading: col = c.accentColor; break;
+            case ManuscriptToken::Kind::Time: col = c.timelineRuler; break;
+            case ManuscriptToken::Kind::Action:
+                col = t.resolved ? c.warningColor : c.errorColor;
+                break;
+            default:
+                col = t.resolved ? ed.project.elementColor(t.targetId) : c.errorColor;
+                break;
+        }
+
+        const float thickness = t.kind == ManuscriptToken::Kind::Value ? 2.5f : 1.5f;
+        dl->AddRectFilled(ImVec2(x0 - 2.0f, y), ImVec2(x1 + 2.0f, y + geo.lineHeight),
+                          theme::u32(theme::withAlpha(col, 0.16f)), 3.0f);
+        dl->AddLine(ImVec2(x0 - 2.0f, y + geo.lineHeight - 1.0f),
+                    ImVec2(x1 + 2.0f, y + geo.lineHeight - 1.0f), theme::u32(col), thickness);
+    }
+    dl->PopClipRect();
 }
 
 // Fliesstext mit eingebetteten, anklickbaren Marken.
@@ -442,15 +571,56 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
         drawRendered(ed, text, true, st.showMarks);
     } else {
         ImGui::PushStyleColor(ImGuiCol_FrameBg, theme::mix(c.panelBackground, c.backgroundColor, 0.2f));
-        const ImGuiInputTextFlags flags =
-            ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackAlways;
-        ImGui::InputTextMultiline("##text", &text, ImVec2(-1, -1), flags, editCallback, &st);
+
+        // Solange Vorschlaege offen sind, gehoeren Enter/Tab/Pfeile/Esc uns.
+        // Ohne das Beanspruchen wuerde das Textfeld einen Zeilenumbruch bzw.
+        // einen Tabulator einfuegen, statt den Vorschlag zu uebernehmen.
+        if (st.completionOpen) {
+            const ImGuiID owner = ImGui::GetID("##completion_keys");
+            // Enter greift nur, wenn wirklich ausgewaehlt wurde - sonst bliebe
+            // hinter einem Satzende wie "@Castle." kein Weg zum Absatz.
+            const bool enterAccepts = st.pickFiltered || st.pickMoved;
+            const bool byEnter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) ||
+                                 ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+            const bool accept = ImGui::IsKeyPressed(ImGuiKey_Tab, false) ||
+                                (byEnter && enterAccepts);
+            if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) {
+                ++st.completionPick;
+                st.pickMoved = true;
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) {
+                --st.completionPick;
+                st.pickMoved = true;
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+                st.muted = true;
+                st.mutedWord = st.completionWord;
+            }
+            if (accept && !st.pickText.empty()) st.acceptRequested = true;
+            for (ImGuiKey key : {ImGuiKey_Tab, ImGuiKey_Escape, ImGuiKey_UpArrow,
+                                 ImGuiKey_DownArrow})
+                ImGui::SetKeyOwner(key, owner);
+            if (enterAccepts) {
+                ImGui::SetKeyOwner(ImGuiKey_Enter, owner);
+                ImGui::SetKeyOwner(ImGuiKey_KeypadEnter, owner);
+            }
+        }
+
+        ImGui::InputTextMultiline("##text", &text, ImVec2(-1, -1),
+                                  ImGuiInputTextFlags_CallbackAlways, editCallback, &st);
+        const ImGuiID inputId = ImGui::GetItemID();
         const bool editing = ImGui::IsItemActive();
         if (ImGui::IsItemEdited()) ed.markManuscript();
         ImGui::PopStyleColor();
 
+        // Marken sichtbar machen - sonst sieht der geschriebene Text aus wie
+        // Fliesstext und man erkennt keine Verweise.
+        const TextGeometry geo = textGeometry("##text", inputId, text);
+        drawMarkHighlights(ed, text, geo);
+
         // ------------------------------------------------ Autovervollstaendigung
-        if (editing && st.completionStart >= 0) {
+        st.completionOpen = false;
+        if (editing && st.completionStart >= 0 && !st.muted) {
             // Nach einem Punkt werden die Felder des Elements angeboten:
             // "@Robert." -> spitzname, alter, ...
             const size_t dot = st.completionWord.find('.');
@@ -459,6 +629,9 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
             std::vector<ImVec4> colors;
             bool fieldMode = false;
             const bool actionMode = st.completionSigil == '!';
+            // Wurde etwas getippt, das die Liste einengt? Nur dann darf Enter
+            // uebernehmen statt einen Absatz zu machen.
+            bool filtered = !st.completionWord.empty();
 
             if (actionMode) {
                 for (const Action* a : ed.project.sortedActions()) {
@@ -481,6 +654,7 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
                 }
                 if (owner) {
                     fieldMode = true;
+                    filtered = !fieldPart.empty();
                     for (const std::string& key : owner->fieldOrder) {
                         if (!fieldPart.empty() && !iequalsContains(key, fieldPart)) continue;
                         const std::string value = ed.project.valueAt(owner->id, key, timeHere);
@@ -504,17 +678,31 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
                 }
             }
             if (!matches.empty()) {
-                ImGui::SetNextWindowPos(
-                    ImVec2(ImGui::GetItemRectMin().x + 40.0f, ImGui::GetItemRectMin().y + 40.0f),
-                    ImGuiCond_Always);
+                const int count = static_cast<int>(matches.size());
+                if (st.completionPick < 0) st.completionPick = count - 1;
+                if (st.completionPick >= count) st.completionPick = 0;
+                st.pickText = matches[static_cast<size_t>(st.completionPick)];
+                st.pickFiltered = filtered;
+                st.completionOpen = true;
+
+                // direkt unter die Marke setzen, nicht quer ueber den Text
+                ImVec2 at(ImGui::GetItemRectMin().x + 40.0f, ImGui::GetItemRectMin().y + 40.0f);
+                if (geo.valid) {
+                    const ImVec2 caret =
+                        posOfOffset(geo, text, static_cast<size_t>(st.completionStart));
+                    at = ImVec2(std::min(caret.x, geo.clip.Max.x - 240.0f),
+                                caret.y + geo.lineHeight + 3.0f);
+                    at.x = std::max(at.x, geo.clip.Min.x);
+                }
+                ImGui::SetNextWindowPos(at, ImGuiCond_Always);
                 ImGui::SetNextWindowBgAlpha(0.95f);
                 ImGui::Begin("##completion", nullptr,
                              ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
                                  ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav |
                                  ImGuiWindowFlags_NoMove);
-                ui::textSecondary(actionMode  ? TR("Aktion waehlen - Tab uebernimmt")
-                                  : fieldMode ? TR("Feld waehlen - Tab uebernimmt")
-                                              : TR("Tab uebernimmt, Esc schliesst"));
+                ui::textSecondary(actionMode  ? TR("Aktion waehlen - Enter uebernimmt")
+                                  : fieldMode ? TR("Feld waehlen - Enter uebernimmt")
+                                              : TR("Enter uebernimmt, Pfeile waehlen, Esc schliesst"));
                 for (size_t i = 0; i < matches.size(); ++i) {
                     ui::colorDot(colors[i]);
                     const bool picked = static_cast<int>(i) == st.completionPick;
@@ -527,26 +715,14 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
                     }
                 }
                 ImGui::End();
-
-                if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
-                    st.completionPick = (st.completionPick + 1) % static_cast<int>(matches.size());
-                if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
-                    st.completionPick = (st.completionPick + static_cast<int>(matches.size()) - 1) %
-                                        static_cast<int>(matches.size());
-                if (ImGui::IsKeyPressed(ImGuiKey_Tab, false)) {
-                    const std::string pick =
-                        matches[static_cast<size_t>(std::min<int>(st.completionPick,
-                                                                  static_cast<int>(matches.size()) - 1))];
-                    // das bereits getippte Stueck ersetzen
-                    const int from = st.completionStart + 1;
-                    if (from <= static_cast<int>(text.size()) && st.cursor >= from)
-                        text.erase(static_cast<size_t>(from),
-                                   static_cast<size_t>(st.cursor - from));
-                    insertAtCursor(st, pick);
-                    st.completionPick = 0;
-                    ed.markManuscript();
-                }
+                // Enter, Tab, Pfeile und Esc werden vor dem Textfeld
+                // ausgewertet - hier gibt es nichts mehr zu tun.
             }
+        }
+        if (!st.completionOpen) {
+            st.pickText.clear();
+            st.pickFiltered = false;
+            st.pickMoved = false;
         }
     }
     ImGui::EndChild();

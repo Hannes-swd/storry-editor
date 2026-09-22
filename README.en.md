@@ -81,7 +81,15 @@ the text are clickable variables while writing and become values when reading:
 | `## Chapter 1` | heading, shows up in the outline |
 | `!act:…` | linked action - typed as `!` or via "Place action"; **invisible** in the finished text, purely organisational |
 
-Typing `@` suggests matching elements (Tab accepts). **"Action from paragraph"** turns the
+The markers are visible while you write: each gets a coloured underline in its group's colour -
+a reference to a name that does not exist turns **red**, so a typo stands out at once.
+
+Typing `@` (elements) or `!` (actions) suggests matching entries right below the cursor.
+**Enter** accepts the suggestion, the **arrow keys** choose, **Esc** closes the list; **Tab**
+always accepts. Enter still starts a new paragraph as long as nothing was picked - so after a
+sentence ending like "... in front of the @Castle." you simply get the next line.
+
+**"Action from paragraph"** turns the
 paragraph at the cursor into an action: title from the first sentence, time from the last time
 marker, involved elements from the `@` references in that paragraph - so the timeline fills up
 while you write instead of through forms.

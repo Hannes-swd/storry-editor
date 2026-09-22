@@ -82,8 +82,17 @@ werden:
 | `## Kapitel 1` | Überschrift, erscheint in der Gliederung |
 | `!act:…` | verknüpfte Aktion – mit `!` beim Tippen oder über „Aktion setzen“; im fertigen Text **unsichtbar**, rein organisatorisch |
 
-Beim Tippen von `@` schlägt der Editor passende Elemente vor (Tab übernimmt). **„Aktion aus
-Absatz"** macht aus dem Absatz am Cursor eine Aktion: Titel aus dem ersten Satz, Zeitpunkt aus
+Schon beim Schreiben sind die Marken zu erkennen: jede bekommt einen farbigen Unterstrich in
+der Farbe ihrer Gruppe – ein Verweis auf einen Namen, den es nicht gibt, wird **rot**, damit ein
+Tippfehler sofort auffällt.
+
+Beim Tippen von `@` (Elemente) oder `!` (Aktionen) schlägt der Editor passende Einträge direkt
+unter dem Cursor vor. **Enter** übernimmt den Vorschlag, die **Pfeiltasten** wählen aus, **Esc**
+schließt die Liste; **Tab** übernimmt immer. Enter macht weiterhin einen Absatz, solange nichts
+ausgewählt wurde – hinter einem Satzende wie „… vor der @Castle." kommt man also normal in die
+nächste Zeile.
+
+**„Aktion aus Absatz"** macht aus dem Absatz am Cursor eine Aktion: Titel aus dem ersten Satz, Zeitpunkt aus
 der letzten Zeitmarke, Beteiligte aus den `@`-Verweisen im Absatz – die Timeline füllt sich also
 beim Schreiben, nicht durch Formulare.
 
