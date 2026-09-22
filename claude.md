@@ -1408,7 +1408,7 @@ A brave knight with a troubled past...
 - Wenn Datei gleichzeitig extern bearbeitet wird: Reload/Merge Dialog
 - Wenn Löschen würde Links brechen: Warnung mit Details
 
----
+  ---
 
 ## 8. Priorisierung (Phasen)
 
