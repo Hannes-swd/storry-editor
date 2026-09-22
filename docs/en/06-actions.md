@@ -40,7 +40,7 @@ An **action** is an event in your story. It has:
 You are already writing a scene. Just turn it into an event:
 
 1. Put the cursor anywhere inside the paragraph
-2. **Insert → Action from this paragraph**
+2. **Insert → From paragraph** (or right click → **Action from this paragraph**)
 
 The program fills everything in itself:
 
@@ -116,7 +116,7 @@ Above the table it always says how much gets through: *"6 of 6 actions"*.
 ## 6.4 Creating an action by hand
 
 **+ New action** in the panel, <kbd>Ctrl</kbd>+<kbd>T</kbd>, double click an empty spot
-in the timeline, or **Insert → Link an action → + New action here**.
+in the timeline, or **Insert → Action → + New action here**.
 
 ```
 ┌─ New action ────────────────────────────────────────────┐
@@ -220,7 +220,7 @@ available everywhere from then on.
 
 If an action already exists and you want to pin it to a place in the text:
 
-**Insert → Link an action** → search → click.
+**Insert → Action** → search → click.
 
 The text then contains `!act:…` – visible as a coloured marker while writing, invisible
 in the finished text. It only says: *"this event happens here in the narration."*
@@ -248,7 +248,7 @@ There is no "refresh" button – all windows always show the same state.
 ## ✅ In short
 
 - An **action** = an event at a point in time, with participants
-- Fastest route: **Insert → Action from this paragraph**
+- Fastest route: **Insert → From paragraph** or right click → **Action from this paragraph**
 - **Changes** on an action shift values from that point on – everywhere
 - Types, strands and tags can be extended freely
 - Actions panel and timeline show the same data, differently

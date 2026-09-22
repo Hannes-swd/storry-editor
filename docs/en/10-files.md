@@ -85,24 +85,28 @@ Alternatively, put a field of type **File** into the template
 
 ## 10.5 As a Word file
 
-**Manuscript → View → Save as Word…**
+**Manuscript → File → As Word**
 or **File → Manuscript as Word (.docx)…**
 
 What comes out:
 
 | In the manuscript | In the Word file |
 |:--|:--|
-| Project name | Title on the first page |
+| Project name | Title on the first page – unless the manuscript has its own title (`# …`) |
+| `# Title` | Title |
 | `## Chapter 1` | Heading 1 |
 | `### Scene` | Heading 2 |
 | `@Alice` | `Alice` |
 | `@Alice.age` | The number belonging to that spot |
-| `**bold**` / `*italic*` | Real **bold** / *italic* |
+| Bold, italic, underline, strikethrough, super‑/subscript | The same formatting in Word |
+| Font, size, colour, highlight | The same formatting in Word |
+| Alignment, bullets, numbering | The same formatting in Word |
 | `---` | Centred separator `* * *` |
 | `#Day 5, 14:00` | **gone** |
 | `!act:…` | **gone** |
-| Blank line | New paragraph |
-| Line break inside a paragraph | Soft break |
+| Bookmarks, comments | **gone** |
+| Every line | One paragraph – just like on the page in the editor |
+| Base font, line spacing, margins, paper size | From **Layout** |
 
 The file is a normal `.docx` and opens in Word, LibreOffice or Google Docs. You do not
 need Word installed – the program builds the package itself.

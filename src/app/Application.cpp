@@ -318,6 +318,8 @@ int Application::run() {
             createRenderTarget();
         }
 
+        // Schriftarten, die das Manuskript im letzten Frame angefordert hat
+        theme::loadPendingFonts();
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();

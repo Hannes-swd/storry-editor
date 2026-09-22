@@ -156,12 +156,14 @@ src/
 
 | File | Responsible for |
 |:--|:--|
-| `core/Manuscript.cpp` | The only place that knows the markers `@`, `#`, `!act:`, `**`, `---` |
+| `core/Manuscript.cpp` | The only place that knows the markers (`@`, `#`, `!act:`, `**`, `<u>`, `<span>`, `%%…%%`, `---`) – reads them and writes formatting back |
 | `core/StoryTime.cpp` | Reading and writing time |
 | `core/Project.cpp` | Data model, `valueAt()`, groups, templates |
 | `core/VaultIO.cpp` | Reading and writing the vault |
 | `core/DocxExport.cpp` | Builds the `.docx` package by hand (ZIP + OOXML, no third-party library) |
-| `ui/ManuscriptWindow.cpp` | The writing window |
+| `ui/DocumentView.cpp` | The writing surface: page layout with a line cache, cursor, selection, keyboard, editing through a line model |
+| `ui/ManuscriptWindow.cpp` | The writing window: ribbon, navigation pane, find, status bar |
+| `ui/Ribbon.cpp` | Building blocks and drawn icons of the ribbon |
 | `ui/Theme.cpp` | Colour scheme – **all** colours come from here |
 | `ui/Lang.cpp` | Translation table |
 
@@ -181,8 +183,10 @@ src/
 StoryEditor.exe --selftest
 ```
 
-122 checks, no interface, exit code `0` = all good. The report also lands in
-`%APPDATA%/StoryEditor/selftest.txt`.
+Almost 200 checks, no interface, exit code `0` = all good. The report also lands in
+`%APPDATA%/StoryEditor/selftest.txt`. The environment variable `STORYEDITOR_HOME` redirects
+settings and report to another folder – handy for testing without touching your own
+configuration.
 
 Among the things checked:
 
@@ -191,9 +195,10 @@ Among the things checked:
 | **Time** | Parsing, formatting, round trip |
 | **Templates** | Inheritance, defaults, fields added afterwards |
 | **Changes** | Value before and after an action, relative points in time |
-| **Manuscript** | Recognising markers, inserting values, bold/italic, scene breaks, search |
+| **Manuscript** | Recognising markers, inserting values, reading every format and writing it back losslessly, line kinds, bookmarks, comments, search |
+| **Writing surface** | Typing, formatting, deleting across formatting, lists, undo, clipboard, page layout and its speed |
 | **Vault** | Save and reload, renaming, older project formats |
-| **Word export** | Valid ZIP, headings, bold/italic, no markers in the text |
+| **Word export** | Valid ZIP, headings, formatting, alignment, lists, no markers in the text |
 
 ---
 
@@ -225,7 +230,7 @@ runs without an installed VC++ redistributable (static CRT).
 - Elements are Markdown, everything structured is JSON – both readable and Git friendly
 - Time is internally just a number: minutes since the start of the story
 - Values at a point in time are **computed**, not stored
-- `--selftest` verifies 122 things before you rely on anything
+- `--selftest` verifies almost 200 things before you rely on anything
 - Colours and texts are consistently lifted out of the code
 
 ---

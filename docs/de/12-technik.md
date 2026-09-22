@@ -156,12 +156,14 @@ src/
 
 | Datei | Zuständig für |
 |:--|:--|
-| `core/Manuscript.cpp` | Der einzige Ort, der die Marken `@`, `#`, `!act:`, `**`, `---` kennt |
+| `core/Manuscript.cpp` | Der einzige Ort, der die Marken kennt (`@`, `#`, `!act:`, `**`, `<u>`, `<span>`, `%%…%%`, `---`) – liest sie und schreibt Formatierung zurück |
 | `core/StoryTime.cpp` | Zeit lesen und schreiben |
 | `core/Project.cpp` | Datenmodell, `valueAt()`, Gruppen, Vorlagen |
 | `core/VaultIO.cpp` | Lesen und Schreiben des Vaults |
 | `core/DocxExport.cpp` | Baut das `.docx`-Paket von Hand (ZIP + OOXML, ohne Fremdbibliothek) |
-| `ui/ManuscriptWindow.cpp` | Das Schreibfenster |
+| `ui/DocumentView.cpp` | Das Schreibfeld: Seitenlayout mit Zeilen-Cache, Cursor, Auswahl, Tastatur, Bearbeiten über ein Zeilenmodell |
+| `ui/ManuscriptWindow.cpp` | Das Schreibfenster: Menüband, Navigationsbereich, Suchen, Statusleiste |
+| `ui/Ribbon.cpp` | Bausteine und gezeichnete Symbole des Menübands |
 | `ui/Theme.cpp` | Farbschema – **alle** Farben kommen von hier |
 | `ui/Lang.cpp` | Übersetzungstabelle |
 
@@ -181,8 +183,10 @@ src/
 StoryEditor.exe --selftest
 ```
 
-122 Prüfungen, keine Oberfläche, Exitcode `0` = alles gut. Der Bericht landet außerdem
-in `%APPDATA%/StoryEditor/selftest.txt`.
+Knapp 200 Prüfungen, keine Oberfläche, Exitcode `0` = alles gut. Der Bericht landet außerdem
+in `%APPDATA%/StoryEditor/selftest.txt`. Mit der Umgebungsvariable `STORYEDITOR_HOME`
+lassen sich Einstellungen und Bericht in einen anderen Ordner lenken – praktisch zum
+Testen, ohne die eigene Konfiguration anzufassen.
 
 Geprüft werden unter anderem:
 
@@ -191,9 +195,10 @@ Geprüft werden unter anderem:
 | **Zeit** | Parsen, Formatieren, Hin‑und‑Rück‑Umwandlung |
 | **Vorlagen** | Vererbung, Standardwerte, nachträglich ergänzte Felder |
 | **Änderungen** | Wert vor und nach einer Aktion, relative Zeitpunkte |
-| **Manuskript** | Marken erkennen, Werte einsetzen, Fett/Kursiv, Szenenwechsel, Suche |
+| **Manuskript** | Marken erkennen, Werte einsetzen, alle Formate lesen und verlustfrei zurückschreiben, Zeilenarten, Lesezeichen, Kommentare, Suche |
+| **Schreibfeld** | Tippen, Formatieren, Löschen quer durch Formatierung, Listen, Undo, Zwischenablage, Seitenlayout und seine Geschwindigkeit |
 | **Vault** | Speichern und Wiederladen, Umbenennen, alte Projektformate |
-| **Word‑Export** | Gültiges ZIP, Überschriften, Fett/Kursiv, keine Marken im Text |
+| **Word‑Export** | Gültiges ZIP, Überschriften, Formatierung, Ausrichtung, Listen, keine Marken im Text |
 
 ---
 
@@ -225,7 +230,7 @@ ohne installiertes VC++-Redistributable (statische CRT).
 - Elemente sind Markdown, alles Strukturierte ist JSON – beides lesbar und Git‑tauglich
 - Zeit ist intern nur eine Zahl: Minuten seit Geschichtsbeginn
 - Werte zu einem Zeitpunkt werden **berechnet**, nicht gespeichert
-- `--selftest` prüft 122 Dinge, bevor du dich auf etwas verlässt
+- `--selftest` prüft knapp 200 Dinge, bevor du dich auf etwas verlässt
 - Farben und Texte sind konsequent aus dem Code herausgezogen
 
 ---

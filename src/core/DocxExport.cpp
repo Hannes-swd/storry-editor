@@ -1,5 +1,6 @@
 #include "core/DocxExport.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <ctime>
 #include <vector>
@@ -157,153 +158,164 @@ std::string isoNow() {
     return buf;
 }
 
-// Ein Textstueck mit gleichbleibender Auszeichnung. "**fett**" und "*kursiv*"
-// aus dem Manuskript werden hier zu echten Word-Attributen.
+// Ein Textstueck mit gleichbleibendem Zeichenformat.
 struct Run {
     std::string text;
-    bool bold = false;
-    bool italic = false;
-    bool lineBreak = false;  // weicher Umbruch vor diesem Stueck
+    TextStyle style;
 };
 
-// Ein Absatz: Ueberschrift, Szenenwechsel oder Fliesstext.
+// Ein Absatz: jede Zeile des Manuskripts wird einer - so sieht die Word-Datei
+// genauso aus wie die Seite im Editor.
 struct Para {
-    enum class Kind { Body, Heading, SceneBreak };
+    enum class Kind { Body, Heading, SceneBreak, Bullet, Numbered };
 
     Kind kind = Kind::Body;
     int headingLevel = 0;
+    int number = 0;
+    LineAlign align = LineAlign::Left;
     std::vector<Run> runs;
 };
 
-std::string trimmed(const std::string& line) {
-    const size_t b = line.find_first_not_of(" \t\r");
-    if (b == std::string::npos) return std::string();
-    const size_t e = line.find_last_not_of(" \t\r");
-    return line.substr(b, e - b + 1);
-}
-
-bool isSceneBreak(const std::string& line) {
-    if (line.size() < 3) return false;
-    for (char c : line) {
-        if (c != '-') return false;
+void addRun(std::vector<Run>& runs, const std::string& text, const TextStyle& style) {
+    if (text.empty()) return;
+    if (!runs.empty() && runs.back().style == style) {
+        runs.back().text += text;
+        return;
     }
-    return true;
+    runs.push_back({text, style});
 }
 
-// Zerlegt eine Zeile an den Sternchen. Die Zeichen selbst wandern nicht in den
-// Text - sie werden zu fett/kursiv.
-void appendRuns(std::vector<Run>& runs, const std::string& line, bool firstLineOfPara) {
-    bool bold = false;
-    bool italic = false;
-    std::string current;
-    bool pendingBreak = !firstLineOfPara;
-
-    auto flush = [&]() {
-        if (current.empty()) return;
-        Run r;
-        r.text = current;
-        r.bold = bold;
-        r.italic = italic;
-        r.lineBreak = pendingBreak;
-        runs.push_back(r);
-        pendingBreak = false;
-        current.clear();
-    };
-
-    for (size_t i = 0; i < line.size(); ++i) {
-        if (line[i] == '*') {
-            const bool doubleMark = i + 1 < line.size() && line[i + 1] == '*';
-            flush();
-            if (doubleMark) {
-                bold = !bold;
-                ++i;
-            } else {
-                italic = !italic;
-            }
-            continue;
-        }
-        current += line[i];
-    }
-    flush();
-    // Eine Zeile, die nur aus Auszeichnung bestand, darf den weichen Umbruch
-    // nicht verschlucken.
-    if (pendingBreak && !runs.empty()) runs.back().lineBreak = true;
-}
-
-std::vector<Para> splitParagraphs(const std::string& text) {
+std::vector<Para> buildParagraphs(const Project& p, const std::string& text) {
+    const std::vector<ManuscriptToken> tokens = parseManuscript(p, text);
     std::vector<Para> paras;
-    Para current;
-    auto flush = [&]() {
-        if (!current.runs.empty()) paras.push_back(current);
-        current = Para();
-    };
+    size_t tokenIndex = 0;
 
-    size_t i = 0;
-    while (true) {
-        size_t lineEnd = text.find('\n', i);
-        const bool last = lineEnd == std::string::npos;
-        if (last) lineEnd = text.size();
-        const std::string line = trimmed(text.substr(i, lineEnd - i));
-
-        if (line.empty()) {
-            flush();  // Leerzeile trennt Absaetze
-        } else if (isSceneBreak(line)) {
-            flush();
-            Para b;
-            b.kind = Para::Kind::SceneBreak;
-            Run r;
-            r.text = "* * *";
-            b.runs.push_back(r);
-            paras.push_back(b);
-        } else if (line[0] == '#') {
-            flush();
-            int level = 0;
-            size_t k = 0;
-            while (k < line.size() && line[k] == '#') {
-                ++level;
-                ++k;
+    for (const ManuscriptLine& line : manuscriptLines(text)) {
+        if (line.kind == LineKind::Time) continue;  // steuert nur die Werte
+        Para para;
+        para.align = line.align;
+        para.number = line.number;
+        switch (line.kind) {
+            case LineKind::Break: {
+                para.kind = Para::Kind::SceneBreak;
+                para.align = LineAlign::Center;
+                para.runs.push_back({"* * *", TextStyle()});
+                paras.push_back(para);
+                continue;
             }
-            while (k < line.size() && line[k] == ' ') ++k;
-            // Im Manuskript ist "## Kapitel" die oberste Ueberschrift, darum
-            // wird ein Rautenzeichen abgezogen.
-            Para h;
-            h.kind = Para::Kind::Heading;
-            h.headingLevel = level >= 3 ? 2 : 1;
-            appendRuns(h.runs, line.substr(k), true);
-            if (!h.runs.empty()) paras.push_back(h);
-        } else {
-            appendRuns(current.runs, line, current.runs.empty());
+            case LineKind::Heading:
+                // "# Titel" wird Words Titel, "## Kapitel" Ueberschrift 1,
+                // "### Szene" (und tiefer) Ueberschrift 2.
+                para.kind = Para::Kind::Heading;
+                para.headingLevel = line.level <= 1 ? 0 : line.level == 2 ? 1 : 2;
+                addRun(para.runs, text.substr(line.contentBegin, line.contentEnd - line.contentBegin),
+                       TextStyle());
+                paras.push_back(para);
+                continue;
+            case LineKind::Bullet: para.kind = Para::Kind::Bullet; break;
+            case LineKind::Numbered: para.kind = Para::Kind::Numbered; break;
+            default: break;
         }
 
-        if (last) break;
-        i = lineEnd + 1;
+        // Alle Marken, die in den Inhalt der Zeile fallen
+        while (tokenIndex < tokens.size() && tokens[tokenIndex].end <= line.contentBegin &&
+               tokens[tokenIndex].begin < line.contentBegin)
+            ++tokenIndex;
+        for (size_t k = tokenIndex; k < tokens.size(); ++k) {
+            const ManuscriptToken& t = tokens[k];
+            if (t.begin >= line.contentEnd) break;
+            if (t.end <= line.contentBegin) continue;
+            switch (t.kind) {
+                case ManuscriptToken::Kind::Text: {
+                    const size_t b = std::max(t.begin, line.contentBegin);
+                    const size_t e = std::min(t.end, line.contentEnd);
+                    std::string piece = text.substr(b, e - b);
+                    piece.erase(std::remove(piece.begin(), piece.end(), '\r'), piece.end());
+                    addRun(para.runs, piece, t.style);
+                    break;
+                }
+                case ManuscriptToken::Kind::Element:
+                    addRun(para.runs, t.resolved ? p.displayName(t.targetId) : t.raw, t.style);
+                    break;
+                case ManuscriptToken::Kind::Value: {
+                    std::string value = t.resolved ? p.valueAt(t.targetId, t.field, t.time) : t.raw;
+                    if (t.resolved && value.empty()) value = p.displayName(t.targetId);
+                    addRun(para.runs, value, t.style);
+                    break;
+                }
+                default:
+                    break;  // Formatzeichen, Aktionen, Lesezeichen, Kommentare
+            }
+        }
+        paras.push_back(para);
     }
-    flush();
     return paras;
 }
 
-std::string paragraphXml(const Para& para) {
-    std::string out = "<w:p>";
-    if (para.kind == Para::Kind::Heading)
-        out += "<w:pPr><w:pStyle w:val=\"Heading" + std::to_string(para.headingLevel) +
-               "\"/></w:pPr>";
-    else if (para.kind == Para::Kind::SceneBreak)
-        out += "<w:pPr><w:jc w:val=\"center\"/><w:spacing w:before=\"240\" w:after=\"240\"/>"
-               "</w:pPr>";
+// "#C00000" -> "C00000"
+std::string hexOf(const std::string& color) { return color.size() == 7 ? color.substr(1) : color; }
 
-    for (const Run& run : para.runs) {
-        out += "<w:r>";
-        if (run.bold || run.italic) {
-            out += "<w:rPr>";
-            if (run.bold) out += "<w:b/>";
-            if (run.italic) out += "<w:i/>";
-            out += "</w:rPr>";
-        }
-        if (run.lineBreak) out += "<w:br/>";
-        out += "<w:t xml:space=\"preserve\">" + xmlEscape(run.text) + "</w:t>";
-        out += "</w:r>";
+std::string runXml(const Run& run, const DocxOptions& options) {
+    const TextStyle& s = run.style;
+    std::string props;
+    if (!s.font.empty() && s.font != options.font)
+        props += "<w:rFonts w:ascii=\"" + xmlEscape(s.font) + "\" w:hAnsi=\"" + xmlEscape(s.font) +
+                 "\" w:cs=\"" + xmlEscape(s.font) + "\"/>";
+    if (s.bold) props += "<w:b/>";
+    if (s.italic) props += "<w:i/>";
+    if (s.strike) props += "<w:strike/>";
+    if (!s.color.empty()) props += "<w:color w:val=\"" + hexOf(s.color) + "\"/>";
+    if (s.size > 0.0f)
+        props += "<w:sz w:val=\"" + std::to_string(static_cast<int>(s.size * 2.0f + 0.5f)) + "\"/>";
+    if (!s.background.empty())
+        props += "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"" + hexOf(s.background) + "\"/>";
+    if (s.underline) props += "<w:u w:val=\"single\"/>";
+    if (s.superscript) props += "<w:vertAlign w:val=\"superscript\"/>";
+    else if (s.subscript) props += "<w:vertAlign w:val=\"subscript\"/>";
+
+    std::string out = "<w:r>";
+    if (!props.empty()) out += "<w:rPr>" + props + "</w:rPr>";
+    // Tabulatoren sind in Word ein eigenes Element.
+    size_t start = 0;
+    while (true) {
+        const size_t tab = run.text.find('\t', start);
+        const std::string piece = run.text.substr(start, tab == std::string::npos ? std::string::npos
+                                                                                : tab - start);
+        if (!piece.empty()) out += "<w:t xml:space=\"preserve\">" + xmlEscape(piece) + "</w:t>";
+        if (tab == std::string::npos) break;
+        out += "<w:tab/>";
+        start = tab + 1;
     }
-    if (para.runs.empty()) out += "<w:r/>";
+    out += "</w:r>";
+    return out;
+}
+
+std::string paragraphXml(const Para& para, const DocxOptions& options) {
+    std::string props;
+    if (para.kind == Para::Kind::Heading)
+        props += para.headingLevel == 0
+                     ? std::string("<w:pStyle w:val=\"Title\"/>")
+                     : "<w:pStyle w:val=\"Heading" + std::to_string(para.headingLevel) + "\"/>";
+    if (para.kind == Para::Kind::SceneBreak)
+        props += "<w:spacing w:before=\"240\" w:after=\"240\"/>";
+    if (para.kind == Para::Kind::Bullet || para.kind == Para::Kind::Numbered)
+        props += "<w:ind w:left=\"720\" w:hanging=\"360\"/>";
+    switch (para.align) {
+        case LineAlign::Center: props += "<w:jc w:val=\"center\"/>"; break;
+        case LineAlign::Right: props += "<w:jc w:val=\"right\"/>"; break;
+        case LineAlign::Justify: props += "<w:jc w:val=\"both\"/>"; break;
+        default: break;
+    }
+
+    std::string out = "<w:p>";
+    if (!props.empty()) out += "<w:pPr>" + props + "</w:pPr>";
+    // Aufzaehlungszeichen als Text mit haengendem Einzug - das kommt ohne
+    // eigene Nummerierungsdefinition aus und sieht in Word genauso aus.
+    if (para.kind == Para::Kind::Bullet)
+        out += runXml({"\xE2\x80\xA2\t", TextStyle()}, options);
+    else if (para.kind == Para::Kind::Numbered)
+        out += runXml({std::to_string(para.number) + ".\t", TextStyle()}, options);
+    for (const Run& run : para.runs) out += runXml(run, options);
     out += "</w:p>";
     return out;
 }
@@ -338,43 +350,57 @@ const char* kDocumentRels =
     "relationships/styles\" Target=\"styles.xml\"/>"
     "</Relationships>";
 
-const char* kStyles =
-    "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
-    "<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">"
-    "<w:docDefaults><w:rPrDefault><w:rPr>"
-    "<w:rFonts w:ascii=\"Georgia\" w:hAnsi=\"Georgia\"/><w:sz w:val=\"24\"/>"
-    "</w:rPr></w:rPrDefault>"
-    "<w:pPrDefault><w:pPr><w:spacing w:after=\"160\" w:line=\"276\" w:lineRule=\"auto\"/>"
-    "</w:pPr></w:pPrDefault></w:docDefaults>"
-    "<w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\">"
-    "<w:name w:val=\"Normal\"/></w:style>"
-    "<w:style w:type=\"paragraph\" w:styleId=\"Title\"><w:name w:val=\"Title\"/>"
-    "<w:basedOn w:val=\"Normal\"/><w:pPr><w:spacing w:after=\"360\"/></w:pPr>"
-    "<w:rPr><w:b/><w:sz w:val=\"56\"/></w:rPr></w:style>"
-    "<w:style w:type=\"paragraph\" w:styleId=\"Heading1\"><w:name w:val=\"heading 1\"/>"
-    "<w:basedOn w:val=\"Normal\"/><w:pPr><w:keepNext/>"
-    "<w:spacing w:before=\"480\" w:after=\"200\"/><w:outlineLvl w:val=\"0\"/></w:pPr>"
-    "<w:rPr><w:b/><w:sz w:val=\"36\"/></w:rPr></w:style>"
-    "<w:style w:type=\"paragraph\" w:styleId=\"Heading2\"><w:name w:val=\"heading 2\"/>"
-    "<w:basedOn w:val=\"Normal\"/><w:pPr><w:keepNext/>"
-    "<w:spacing w:before=\"360\" w:after=\"160\"/><w:outlineLvl w:val=\"1\"/></w:pPr>"
-    "<w:rPr><w:b/><w:sz w:val=\"30\"/></w:rPr></w:style>"
-    "</w:styles>";
+// Formatvorlagen: Grundschrift, Zeilenabstand und Ueberschriften kommen aus
+// den Einstellungen des Editors, damit Seite und Word-Datei gleich aussehen.
+std::string stylesXml(const DocxOptions& o) {
+    const std::string font = xmlEscape(o.font.empty() ? std::string("Georgia") : o.font);
+    const int size = static_cast<int>(o.sizePt * 2.0f + 0.5f);
+    const int line = static_cast<int>(o.lineSpacing * 240.0f + 0.5f);
+    return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+           "<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">"
+           "<w:docDefaults><w:rPrDefault><w:rPr>"
+           "<w:rFonts w:ascii=\"" + font + "\" w:hAnsi=\"" + font + "\" w:cs=\"" + font + "\"/>"
+           "<w:sz w:val=\"" + std::to_string(size) + "\"/>"
+           "</w:rPr></w:rPrDefault>"
+           "<w:pPrDefault><w:pPr><w:spacing w:after=\"0\" w:line=\"" + std::to_string(line) +
+           "\" w:lineRule=\"auto\"/></w:pPr></w:pPrDefault></w:docDefaults>"
+           "<w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\">"
+           "<w:name w:val=\"Normal\"/></w:style>"
+           "<w:style w:type=\"paragraph\" w:styleId=\"Title\"><w:name w:val=\"Title\"/>"
+           "<w:basedOn w:val=\"Normal\"/><w:pPr><w:spacing w:after=\"360\"/></w:pPr>"
+           "<w:rPr><w:b/><w:sz w:val=\"52\"/></w:rPr></w:style>"
+           "<w:style w:type=\"paragraph\" w:styleId=\"Heading1\"><w:name w:val=\"heading 1\"/>"
+           "<w:basedOn w:val=\"Normal\"/><w:pPr><w:keepNext/>"
+           "<w:spacing w:before=\"360\" w:after=\"160\"/><w:outlineLvl w:val=\"0\"/></w:pPr>"
+           "<w:rPr><w:b/><w:sz w:val=\"40\"/></w:rPr></w:style>"
+           "<w:style w:type=\"paragraph\" w:styleId=\"Heading2\"><w:name w:val=\"heading 2\"/>"
+           "<w:basedOn w:val=\"Normal\"/><w:pPr><w:keepNext/>"
+           "<w:spacing w:before=\"240\" w:after=\"120\"/><w:outlineLvl w:val=\"1\"/></w:pPr>"
+           "<w:rPr><w:b/><w:sz w:val=\"30\"/></w:rPr></w:style>"
+           "</w:styles>";
+}
+
+int twips(float cm) { return static_cast<int>(cm * 566.93f + 0.5f); }
 
 }  // namespace
 
-std::string buildManuscriptDocx(const Project& p, const std::string& title) {
-    // renderManuscript setzt die Werte ein und laesst Zeit- und Aktionsmarken
-    // weg. Die Auszeichnung bleibt stehen und wird unten zu echtem Word-Fett
-    // bzw. -Kursiv.
-    const std::string rendered = renderManuscript(p, p.manuscript, /*keepFormatting=*/true);
-
+std::string buildManuscriptDocx(const Project& p, const std::string& title,
+                               const DocxOptions& options) {
+    // Jede Zeile wird ein Absatz: Werte sind eingesetzt, Zeit- und
+    // Aktionsmarken, Lesezeichen und Kommentare fallen weg, die Formatierung
+    // wird zu echten Word-Eigenschaften.
     std::string body;
-    if (!title.empty())
+    // Hat das Manuskript selbst einen Titel ("# ..."), ersetzt der den Projektnamen.
+    const std::vector<Para> paras = buildParagraphs(p, p.manuscript);
+    bool ownTitle = false;
+    for (const Para& para : paras) {
+        if (para.kind == Para::Kind::Heading && para.headingLevel == 0) ownTitle = true;
+    }
+    if (!title.empty() && !ownTitle)
         body += "<w:p><w:pPr><w:pStyle w:val=\"Title\"/></w:pPr><w:r>"
                 "<w:t xml:space=\"preserve\">" +
                 xmlEscape(title) + "</w:t></w:r></w:p>";
-    for (const Para& para : splitParagraphs(rendered)) body += paragraphXml(para);
+    for (const Para& para : paras) body += paragraphXml(para, options);
     if (body.empty()) body = "<w:p/>";
 
     const std::string document =
@@ -382,8 +408,12 @@ std::string buildManuscriptDocx(const Project& p, const std::string& title) {
         "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">"
         "<w:body>" +
         body +
-        "<w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\"/>"
-        "<w:pgMar w:top=\"1417\" w:right=\"1417\" w:bottom=\"1417\" w:left=\"1417\" "
+        "<w:sectPr><w:pgSz w:w=\"" + std::to_string(twips(options.pageWidthCm)) + "\" w:h=\"" +
+        std::to_string(twips(options.pageHeightCm)) + "\"/>"
+        "<w:pgMar w:top=\"" + std::to_string(twips(options.marginCm)) + "\" w:right=\"" +
+        std::to_string(twips(options.marginCm)) + "\" w:bottom=\"" +
+        std::to_string(twips(options.marginCm)) + "\" w:left=\"" +
+        std::to_string(twips(options.marginCm)) + "\" "
         "w:header=\"708\" w:footer=\"708\" w:gutter=\"0\"/></w:sectPr>"
         "</w:body></w:document>";
 
@@ -413,12 +443,13 @@ std::string buildManuscriptDocx(const Project& p, const std::string& title) {
     zip.add("docProps/core.xml", core);
     zip.add("word/_rels/document.xml.rels", kDocumentRels);
     zip.add("word/document.xml", document);
-    zip.add("word/styles.xml", kStyles);
+    zip.add("word/styles.xml", stylesXml(options));
     return zip.finish();
 }
 
-bool exportManuscriptDocx(const Project& p, const std::string& path, std::string* err) {
-    return platform::writeFile(path, buildManuscriptDocx(p, p.name), err);
+bool exportManuscriptDocx(const Project& p, const std::string& path, std::string* err,
+                          const DocxOptions& options) {
+    return platform::writeFile(path, buildManuscriptDocx(p, p.name, options), err);
 }
 
 }  // namespace se

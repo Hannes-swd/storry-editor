@@ -189,7 +189,12 @@ void openInShell(const std::string& path) {
 std::string appConfigDir() {
     PWSTR roaming = nullptr;
     std::string dir;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &roaming)) && roaming) {
+    // STORYEDITOR_HOME: eigener Ordner fuer Einstellungen und Layout - fuer
+    // Tests, ohne die echte Konfiguration anzufassen.
+    wchar_t custom[1024] = {0};
+    if (GetEnvironmentVariableW(L"STORYEDITOR_HOME", custom, 1024) > 0) {
+        dir = toUtf8(custom);
+    } else if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &roaming)) && roaming) {
         dir = toUtf8(roaming) + "/StoryEditor";
         CoTaskMemFree(roaming);
     } else {

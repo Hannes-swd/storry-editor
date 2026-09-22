@@ -6,6 +6,7 @@
 #include "app/Application.h"
 #include "app/Platform.h"
 #include "core/SelfTest.h"
+#include "ui/EditingSelfTest.h"
 
 namespace {
 
@@ -37,7 +38,8 @@ int APIENTRY wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
     if (args.find("--selftest") != std::string::npos) {
         attachConsole();
         const std::string report = se::platform::appConfigDir() + "/selftest.txt";
-        const int result = se::runSelfTest(report);
+        int result = se::runSelfTest(report);
+        if (se::runEditingSelfTest(report) != 0) result = 1;
         std::string text;
         se::platform::readFile(report, &text);
         std::printf("%s\nReport: %s\n", text.c_str(), report.c_str());

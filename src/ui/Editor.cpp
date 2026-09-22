@@ -46,6 +46,7 @@ void Editor::shutdown() {
 }
 
 void Editor::newFrame(float dt) {
+    manuscriptKeyboard = false;
     if (statusTimer_ > 0.0f) statusTimer_ -= dt;
     if (saveDelay_ > 0.0f) saveDelay_ -= dt;
     if (hasUnsavedChanges()) sinceDirty_ += dt;
@@ -282,7 +283,14 @@ void Editor::exportManuscriptToWord(const std::string& path) {
     if (target.size() < 5 || target.compare(target.size() - 5, 5, ".docx") != 0) target += ".docx";
 
     std::string err;
-    if (exportManuscriptDocx(project, target, &err))
+    const AppSettings& s = theme::settings();
+    DocxOptions options;
+    options.font = s.docFont;
+    options.sizePt = s.docFontSize;
+    options.lineSpacing = s.docLineSpacing;
+    options.marginCm = s.docMarginCm;
+    theme::pageSizeCm(s.docPageFormat, &options.pageWidthCm, &options.pageHeightCm);
+    if (exportManuscriptDocx(project, target, &err, options))
         setStatus(TR("Word-Datei geschrieben: ") + target);
     else
         setStatus(err.empty() ? TR("Word-Datei konnte nicht geschrieben werden.") : err, true);
@@ -453,13 +461,15 @@ void Editor::handleShortcuts() {
     ImGuiIO& io = ImGui::GetIO();
     if (!io.KeyCtrl) return;
     if (ImGui::IsKeyPressed(ImGuiKey_S, false)) saveEverything();
-    if (ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
-        if (io.KeyShift)
-            redo();
-        else
-            undo();
+    if (!manuscriptKeyboard) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
+            if (io.KeyShift)
+                redo();
+            else
+                undo();
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Y, false)) redo();
     }
-    if (ImGui::IsKeyPressed(ImGuiKey_Y, false)) redo();
     if (!project.loaded) return;
     if (ImGui::IsKeyPressed(ImGuiKey_N, false)) {
         if (io.KeyShift) {
@@ -677,6 +687,9 @@ void drawSettingsWindow(Editor& ed, bool* open) {
             {TR("Verbindungslinie"), &c.edgeColor},
             {TR("Knoten-Umriss"), &c.nodeOutline},
             {TR("Block"), &c.blockColor},
+            {TR("Manuskript: Blatt"), &c.pageColor},
+            {TR("Manuskript: Schrift"), &c.pageTextColor},
+            {TR("Manuskript: Arbeitsflaeche"), &c.workspaceColor},
         };
         bool changed = false;
         for (Entry& e : entries) {

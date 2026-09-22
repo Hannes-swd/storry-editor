@@ -76,7 +76,7 @@ oder spring direkt zu dem, was du gerade brauchst.
 | | |
 |:--|:--|
 | **[📦 1 · Loslegen](docs/de/01-loslegen.md)**<br>Bauen, starten, erstes Projekt anlegen. Was ist ein „Vault"? | **[🪟 2 · Das Programmfenster](docs/de/02-ueberblick.md)**<br>Welches Fenster macht was, wie schiebt man sie herum, wie holt man ein geschlossenes zurück. |
-| **[✍️ 3 · Schreiben](docs/de/03-manuskript.md)**<br>Das Herzstück. Text tippen, Figuren einsetzen, Kapitel, Fett/Kursiv, Suchen & Ersetzen. | **[👥 4 · Figuren, Orte, Dinge](docs/de/04-gruppen.md)**<br>Gruppen anlegen, Elemente erstellen, Vorlagen und Feldtypen. |
+| **[✍️ 3 · Schreiben](docs/de/03-manuskript.md)**<br>Das Herzstück – wie Word: Menüband, Seiten, Schriften, Farben, Listen, Kommentare, Figuren einsetzen, Suchen & Ersetzen. | **[👥 4 · Figuren, Orte, Dinge](docs/de/04-gruppen.md)**<br>Gruppen anlegen, Elemente erstellen, Vorlagen und Feldtypen. |
 
 ### Das Zeit‑System
 

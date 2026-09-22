@@ -38,13 +38,13 @@ Only a **time marker** moves the clock.
 
 ## 5.2 Where you see when you are
 
-The right-hand side of the manuscript bar always shows the point in time the story is
-at **wherever your cursor is**:
+The status bar below the manuscript always shows the point in time the story is at
+**wherever your cursor is**:
 
 ```
-                                    ┌──────────────────────┐
-  … View  ?                         │ Time: Day 5, 14:00   │  ← clickable
-                                    └──────────────────────┘
+            ┌──────────────────────┐
+  Page 1 …  │ Time: Day 5, 14:00   │ ● Saved   ← clickable
+            └──────────────────────┘
 ```
 
 Click the cursor somewhere else in the text – the display changes with it.
@@ -53,7 +53,7 @@ Click the cursor somewhere else in the text – the display changes with it.
 
 ## 5.3 Moving time on
 
-Click the display (or **Insert → Move time on**):
+Click the display (or **Insert → Point in time**):
 
 ```
 ┌─ Point in time ──────────────────────────────────────────┐

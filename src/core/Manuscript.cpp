@@ -2,10 +2,20 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <string_view>
 
 #include "core/StoryTime.h"
 
 namespace se {
+
+bool TextStyle::operator==(const TextStyle& o) const {
+    return bold == o.bold && italic == o.italic && underline == o.underline && strike == o.strike &&
+           superscript == o.superscript && subscript == o.subscript && color == o.color &&
+           background == o.background && size == o.size && font == o.font;
+}
+
 namespace {
 
 bool isNameChar(unsigned char c) {
@@ -20,6 +30,18 @@ bool atLineStart(const std::string& text, size_t pos) {
 
 char lower(char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
 
+size_t lineEndOf(const std::string& text, size_t from) {
+    const size_t e = text.find('\n', from);
+    return e == std::string::npos ? text.size() : e;
+}
+
+// Sucht `needle` nur bis `limit` (z.B. Zeilenende) - ohne Treffer in der Zeile
+// wuerde find() sonst den ganzen restlichen Text durchlaufen.
+size_t findBefore(const std::string& text, const char* needle, size_t from, size_t limit) {
+    const size_t p = std::string_view(text.data(), std::min(limit, text.size())).find(needle, from);
+    return p == std::string_view::npos ? std::string::npos : p;
+}
+
 // "Alice" oder "Characters/Main/Alice" -> Element-ID
 std::string resolveElement(const Project& p, const std::string& reference) {
     if (reference.empty()) return std::string();
@@ -32,23 +54,15 @@ std::string resolveElement(const Project& p, const std::string& reference) {
     return std::string();
 }
 
-// Ende des Absatzes, in dem `from` liegt. Hervorhebungen gelten nie ueber eine
-// Leerzeile hinweg - so faerbt ein vergessenes Sternchen nicht den Rest des
-// Buches ein.
-size_t paragraphEnd(const std::string& text, size_t from) {
-    size_t i = from;
-    while (i + 1 < text.size()) {
-        if (text[i] == '\n' && text[i + 1] == '\n') return i;
-        ++i;
-    }
-    return text.size();
-}
-
 // Gibt es im selben Absatz ein passendes Schlusszeichen? Nur dann ist das
-// Sternchen eine Hervorhebung und kein normales Satzzeichen.
+// Sternchen eine Hervorhebung und kein normales Satzzeichen. Hervorhebungen
+// gelten nie ueber eine Leerzeile hinweg - so faerbt ein vergessenes
+// Sternchen nicht den Rest des Buches ein. Gesucht wird nur bis dorthin (und
+// nicht erst das Absatzende bestimmt): ein Text ohne Leerzeilen waere sonst
+// fuer jedes Sternchen einmal komplett zu durchlaufen.
 bool hasClosingMark(const std::string& text, size_t after, size_t markLength) {
-    const size_t stop = paragraphEnd(text, after);
-    for (size_t i = after; i + markLength <= stop; ++i) {
+    for (size_t i = after; i + markLength <= text.size(); ++i) {
+        if (text[i] == '\n' && i + 1 < text.size() && text[i + 1] == '\n') return false;
         if (text[i] != '*') continue;
         const bool doubleMark = i + 1 < text.size() && text[i + 1] == '*';
         if (markLength == 2 && !doubleMark) continue;
@@ -75,14 +89,126 @@ bool isSceneBreakLine(const std::string& text, size_t lineBegin, size_t lineEnd)
     return dashes >= 3;
 }
 
+bool isHeadingStart(const std::string& text, size_t i) {
+    return text[i] == '#' && atLineStart(text, i) && i + 1 < text.size() &&
+           (text[i + 1] == '#' || text[i + 1] == ' ');
+}
+
+// Steht am Zeilenende eine Ausrichtungsmarke? Liefert ihren Anfang.
+LineAlign alignSuffix(const std::string& text, size_t lineBegin, size_t lineEnd,
+                      size_t* markerBegin) {
+    struct Known {
+        const char* marker;
+        LineAlign align;
+    };
+    static const Known known[] = {{"%%center%%", LineAlign::Center},
+                                  {"%%right%%", LineAlign::Right},
+                                  {"%%justify%%", LineAlign::Justify},
+                                  {"%%left%%", LineAlign::Left}};
+    size_t end = lineEnd;
+    if (end > lineBegin && text[end - 1] == '\r') --end;
+    for (const Known& k : known) {
+        const size_t len = std::char_traits<char>::length(k.marker);
+        if (end - lineBegin >= len && text.compare(end - len, len, k.marker) == 0) {
+            if (markerBegin) *markerBegin = end - len;
+            return k.align;
+        }
+    }
+    if (markerBegin) *markerBegin = lineEnd;
+    return LineAlign::Left;
+}
+
+bool isHexColor(const std::string& s) {
+    if (s.size() != 7 || s[0] != '#') return false;
+    for (size_t i = 1; i < s.size(); ++i) {
+        if (!std::isxdigit(static_cast<unsigned char>(s[i]))) return false;
+    }
+    return true;
+}
+
+std::string trimmedCopy(const std::string& s) {
+    const size_t b = s.find_first_not_of(" \t\"'");
+    if (b == std::string::npos) return std::string();
+    const size_t e = s.find_last_not_of(" \t\"'");
+    return s.substr(b, e - b + 1);
+}
+
+// "color:#C00000; font-size:14pt" -> Stil. Unbekanntes bleibt unbeachtet.
+void applySpanStyle(const std::string& declarations, TextStyle& style) {
+    size_t i = 0;
+    while (i < declarations.size()) {
+        size_t semi = declarations.find(';', i);
+        if (semi == std::string::npos) semi = declarations.size();
+        const std::string decl = declarations.substr(i, semi - i);
+        const size_t colon = decl.find(':');
+        if (colon != std::string::npos) {
+            std::string key = trimmedCopy(decl.substr(0, colon));
+            const std::string value = trimmedCopy(decl.substr(colon + 1));
+            for (char& ch : key) ch = lower(ch);
+            if (key == "color" && isHexColor(value)) {
+                style.color = value;
+            } else if ((key == "background" || key == "background-color") && isHexColor(value)) {
+                style.background = value;
+            } else if (key == "font-size") {
+                const float v = static_cast<float>(std::atof(value.c_str()));
+                if (v > 0.0f) style.size = v;
+            } else if (key == "font-family" && !value.empty()) {
+                style.font = value;
+            }
+        }
+        i = semi + 1;
+    }
+}
+
+std::string formatSize(float size) {
+    char buf[32];
+    if (size == static_cast<float>(static_cast<int>(size)))
+        std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(size));
+    else
+        std::snprintf(buf, sizeof(buf), "%.1f", size);
+    return buf;
+}
+
 }  // namespace
 
 std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string& text) {
     std::vector<ManuscriptToken> out;
     long long currentTime = 0;
     size_t textStart = 0;
+
+    // Zeichenformat, das gerade gilt. Fett und kursiv reichen bis zum Ende des
+    // Absatzes, alles andere endet spaetestens an der Zeile - der Serializer
+    // schliesst ohnehin jede Zeile ab.
     bool bold = false;
     bool italic = false;
+    bool strike = false;
+    bool underline = false;
+    bool superscript = false;
+    bool subscript = false;
+    std::vector<TextStyle> spans;  // verschachtelte <span style=...>
+
+    auto currentStyle = [&]() {
+        TextStyle s = spans.empty() ? TextStyle() : spans.back();
+        s.bold = bold;
+        s.italic = italic;
+        s.strike = strike;
+        s.underline = underline;
+        s.superscript = superscript;
+        s.subscript = subscript;
+        return s;
+    };
+    auto lineStylesActive = [&]() {
+        return strike || underline || superscript || subscript || !spans.empty();
+    };
+    auto resetAll = [&]() {
+        bold = italic = strike = underline = superscript = subscript = false;
+        spans.clear();
+    };
+    auto stamp = [&](ManuscriptToken& t) {
+        t.style = currentStyle();
+        t.bold = bold;
+        t.italic = italic;
+    };
 
     auto flushText = [&](size_t upTo) {
         if (upTo <= textStart) return;
@@ -92,8 +218,19 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
         t.end = upTo;
         t.raw = text.substr(textStart, upTo - textStart);
         t.time = currentTime;
-        t.bold = bold;
-        t.italic = italic;
+        stamp(t);
+        out.push_back(t);
+    };
+    // Formatzeichen: unsichtbar, aber als eigene Marke, damit der Editor und
+    // die Lesefassung wissen, wo sie stehen.
+    auto markup = [&](size_t from, size_t to) {
+        ManuscriptToken t;
+        t.kind = ManuscriptToken::Kind::Markup;
+        t.begin = from;
+        t.end = to;
+        t.raw = text.substr(from, to - from);
+        t.time = currentTime;
+        t.resolved = true;
         out.push_back(t);
     };
 
@@ -102,20 +239,21 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
         const char c = text[i];
 
         // ---------------------------------------------------- Ueberschrift
-        if (c == '#' && atLineStart(text, i) && i + 1 < text.size() &&
-            (text[i + 1] == '#' || text[i + 1] == ' ')) {
-            size_t lineEnd = text.find('\n', i);
-            if (lineEnd == std::string::npos) lineEnd = text.size();
+        if (isHeadingStart(text, i)) {
+            const size_t lineEnd = lineEndOf(text, i);
+            size_t markerBegin = lineEnd;
+            alignSuffix(text, i, lineEnd, &markerBegin);
             flushText(i);
             ManuscriptToken t;
             t.kind = ManuscriptToken::Kind::Heading;
             t.begin = i;
-            t.end = lineEnd;
-            t.raw = text.substr(i, lineEnd - i);
+            t.end = markerBegin;
+            t.raw = text.substr(i, markerBegin - i);
             t.time = currentTime;
             t.resolved = true;
             out.push_back(t);
-            bold = italic = false;  // eine Ueberschrift beendet jede Hervorhebung
+            if (markerBegin < lineEnd) markup(markerBegin, lineEnd);
+            resetAll();  // eine Ueberschrift beendet jede Hervorhebung
             i = lineEnd;
             textStart = i;
             continue;
@@ -123,8 +261,7 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
 
         // ---------------------------------------------------- Szenenwechsel
         if (c == '-' && atLineStart(text, i)) {
-            size_t lineEnd = text.find('\n', i);
-            if (lineEnd == std::string::npos) lineEnd = text.size();
+            const size_t lineEnd = lineEndOf(text, i);
             if (isSceneBreakLine(text, i, lineEnd)) {
                 flushText(i);
                 ManuscriptToken t;
@@ -135,7 +272,7 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
                 t.time = currentTime;
                 t.resolved = true;
                 out.push_back(t);
-                bold = italic = false;
+                resetAll();
                 i = lineEnd;
                 textStart = i;
                 continue;
@@ -144,8 +281,7 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
 
         // ---------------------------------------------------- Zeitmarke
         if (c == '#' && i + 1 < text.size() && text[i + 1] != '#' && text[i + 1] != ' ') {
-            size_t lineEnd = text.find('\n', i);
-            if (lineEnd == std::string::npos) lineEnd = text.size();
+            const size_t lineEnd = lineEndOf(text, i);
             const std::string body = trim(text.substr(i + 1, lineEnd - i - 1));
             long long parsed = 0;
             if (parseStoryTime(body, &parsed)) {
@@ -179,10 +315,41 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
             t.targetId = text.substr(i + 5, j - i - 5);
             t.time = currentTime;
             t.resolved = p.action(t.targetId) != nullptr;
+            stamp(t);
             out.push_back(t);
             i = j;
             textStart = i;
             continue;
+        }
+
+        // ------------------------------------ Lesezeichen, Kommentar, Marke
+        if (c == '%' && i + 1 < text.size() && text[i + 1] == '%') {
+            const size_t lineEnd = lineEndOf(text, i);
+            const size_t close = findBefore(text, "%%", i + 2, lineEnd);
+            if (close != std::string::npos) {
+                flushText(i);
+                const std::string body = text.substr(i + 2, close - i - 2);
+                ManuscriptToken t;
+                t.begin = i;
+                t.end = close + 2;
+                t.raw = text.substr(i, t.end - i);
+                t.time = currentTime;
+                t.resolved = true;
+                if (body.rfind("bm:", 0) == 0) {
+                    t.kind = ManuscriptToken::Kind::Bookmark;
+                    t.field = body.substr(3);
+                } else if (body.rfind("note:", 0) == 0) {
+                    t.kind = ManuscriptToken::Kind::Note;
+                    t.field = body.substr(5);
+                } else {
+                    t.kind = ManuscriptToken::Kind::Markup;
+                }
+                stamp(t);
+                out.push_back(t);
+                i = t.end;
+                textStart = i;
+                continue;
+            }
         }
 
         // ---------------------------------------------------- Hervorhebung
@@ -197,10 +364,80 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
                                  text[after] != '\n' && hasClosingMark(text, after, length);
             if (closing || opening) {
                 flushText(i);
+                markup(i, after);
                 flag = !flag;
                 i = after;
                 textStart = i;
                 continue;
+            }
+        }
+
+        // ---------------------------------------------------- Durchgestrichen
+        if (c == '~' && i + 1 < text.size() && text[i + 1] == '~') {
+            const size_t after = i + 2;
+            const size_t lineEnd = lineEndOf(text, i);
+            const size_t close = findBefore(text, "~~", after, lineEnd);
+            const bool opening = !strike && after < lineEnd && close != std::string::npos;
+            if (strike || opening) {
+                flushText(i);
+                markup(i, after);
+                strike = !strike;
+                i = after;
+                textStart = i;
+                continue;
+            }
+        }
+
+        // ------------------------------------------------ HTML-Auszeichnung
+        if (c == '<') {
+            struct Tag {
+                const char* text;
+                bool* flag;
+                bool value;
+            };
+            const Tag tags[] = {
+                {"<u>", &underline, true},       {"</u>", &underline, false},
+                {"<sup>", &superscript, true},   {"</sup>", &superscript, false},
+                {"<sub>", &subscript, true},     {"</sub>", &subscript, false},
+            };
+            bool matched = false;
+            for (const Tag& tag : tags) {
+                const size_t len = std::char_traits<char>::length(tag.text);
+                if (text.compare(i, len, tag.text) == 0) {
+                    flushText(i);
+                    markup(i, i + len);
+                    *tag.flag = tag.value;
+                    i += len;
+                    textStart = i;
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) continue;
+
+            if (text.compare(i, 7, "</span>") == 0) {
+                flushText(i);
+                markup(i, i + 7);
+                if (!spans.empty()) spans.pop_back();
+                i += 7;
+                textStart = i;
+                continue;
+            }
+            static const char kSpanOpen[] = "<span style=\"";
+            const size_t openLen = sizeof(kSpanOpen) - 1;
+            if (text.compare(i, openLen, kSpanOpen) == 0) {
+                const size_t lineEnd = lineEndOf(text, i);
+                const size_t close = findBefore(text, "\">", i + openLen, lineEnd);
+                if (close != std::string::npos) {
+                    flushText(i);
+                    markup(i, close + 2);
+                    TextStyle next = spans.empty() ? TextStyle() : spans.back();
+                    applySpanStyle(text.substr(i + openLen, close - i - openLen), next);
+                    spans.push_back(next);
+                    i = close + 2;
+                    textStart = i;
+                    continue;
+                }
             }
         }
 
@@ -230,8 +467,7 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
                 t.field = field;
                 t.time = currentTime;
                 t.resolved = !t.targetId.empty();
-                t.bold = bold;
-                t.italic = italic;
+                stamp(t);
                 out.push_back(t);
                 i = j;
                 textStart = i;
@@ -239,11 +475,20 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
             }
         }
 
-        // Eine Leerzeile beendet jede Hervorhebung - siehe paragraphEnd().
-        if (c == '\n' && i + 1 < text.size() && text[i + 1] == '\n' && (bold || italic)) {
-            flushText(i);
-            bold = italic = false;
-            textStart = i;
+        if (c == '\n') {
+            // Unterstreichung, Farbe & Co. enden an der Zeile ...
+            if (lineStylesActive()) {
+                flushText(i);
+                strike = underline = superscript = subscript = false;
+                spans.clear();
+                textStart = i;
+            }
+            // ... fett und kursiv an der Leerzeile - siehe paragraphEnd().
+            if (i + 1 < text.size() && text[i + 1] == '\n' && (bold || italic)) {
+                flushText(i);
+                bold = italic = false;
+                textStart = i;
+            }
         }
 
         ++i;
@@ -252,34 +497,201 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
     return out;
 }
 
+// ------------------------------------------------------------------ Zeilen
+std::vector<ManuscriptLine> manuscriptLines(const std::string& text) {
+    std::vector<ManuscriptLine> lines;
+    int number = 0;
+    size_t b = 0;
+    while (true) {
+        const size_t e = lineEndOf(text, b);
+        ManuscriptLine L;
+        L.begin = b;
+        L.end = e;
+        L.contentBegin = b;
+        L.contentEnd = e;
+        if (e > b && text[e - 1] == '\r') L.contentEnd = e - 1;
+
+        if (b < text.size() && isHeadingStart(text, b)) {
+            L.kind = LineKind::Heading;
+            size_t k = b;
+            while (k < e && text[k] == '#') ++k;
+            L.level = static_cast<int>(k - b);
+            while (k < e && text[k] == ' ') ++k;
+            L.contentBegin = k;
+        } else if (e > b && text[b] == '-' && isSceneBreakLine(text, b, e)) {
+            L.kind = LineKind::Break;
+        } else if (e > b + 1 && text[b] == '#' && text[b + 1] != '#' && text[b + 1] != ' ') {
+            long long parsed = 0;
+            if (parseStoryTime(trim(text.substr(b + 1, e - b - 1)), &parsed)) L.kind = LineKind::Time;
+        } else if (e >= b + 2 && text[b] == '-' && text[b + 1] == ' ') {
+            L.kind = LineKind::Bullet;
+            L.contentBegin = b + 2;
+        } else {
+            size_t k = b;
+            while (k < e && std::isdigit(static_cast<unsigned char>(text[k]))) ++k;
+            if (k > b && k + 1 < e && text[k] == '.' && text[k + 1] == ' ') {
+                L.kind = LineKind::Numbered;
+                L.contentBegin = k + 2;
+            }
+        }
+
+        if (L.kind == LineKind::Body || L.kind == LineKind::Heading || L.kind == LineKind::Bullet ||
+            L.kind == LineKind::Numbered) {
+            size_t markerBegin = L.contentEnd;
+            L.align = alignSuffix(text, L.contentBegin, e, &markerBegin);
+            if (markerBegin < L.contentEnd) L.contentEnd = markerBegin;
+        }
+        if (L.contentEnd < L.contentBegin) L.contentEnd = L.contentBegin;
+
+        number = L.kind == LineKind::Numbered ? number + 1 : 0;
+        L.number = number;
+        lines.push_back(L);
+
+        if (e >= text.size()) break;
+        b = e + 1;
+    }
+    return lines;
+}
+
+size_t lineIndexAt(const std::vector<ManuscriptLine>& lines, size_t offset) {
+    if (lines.empty()) return 0;
+    size_t lo = 0, hi = lines.size();
+    while (hi - lo > 1) {
+        const size_t mid = (lo + hi) / 2;
+        if (lines[mid].begin <= offset)
+            lo = mid;
+        else
+            hi = mid;
+    }
+    return lo;
+}
+
+std::string linePrefix(LineKind kind, int level) {
+    switch (kind) {
+        case LineKind::Heading: return std::string(static_cast<size_t>(std::max(1, level)), '#') + " ";
+        case LineKind::Bullet: return "- ";
+        case LineKind::Numbered: return "1. ";
+        default: return std::string();
+    }
+}
+
+std::string alignMarker(LineAlign align) {
+    switch (align) {
+        case LineAlign::Center: return "%%center%%";
+        case LineAlign::Right: return "%%right%%";
+        case LineAlign::Justify: return "%%justify%%";
+        default: return std::string();
+    }
+}
+
+// ---------------------------------------------------------------- Serializer
+std::string serializeUnits(const std::vector<StyledUnit>& units, std::vector<size_t>* positions) {
+    std::string out;
+    if (positions) positions->assign(units.size(), 0);
+
+    // Gruppen gleichen Formats. Leerzeichen am Rand einer Gruppe gehoeren vor
+    // bzw. hinter die Sternchen: "** x**" wuerde der Parser nicht als
+    // Hervorhebung lesen.
+    struct Group {
+        size_t begin, end, coreBegin, coreEnd;
+    };
+    auto isSpace = [&](size_t k) { return units[k].raw == " " || units[k].raw == "\t"; };
+    std::vector<Group> groups;
+    for (size_t i = 0; i < units.size();) {
+        size_t j = i + 1;
+        while (j < units.size() && units[j].style == units[i].style) ++j;
+        Group g{i, j, i, j};
+        while (g.coreBegin < j && isSpace(g.coreBegin)) ++g.coreBegin;
+        while (g.coreEnd > g.coreBegin && isSpace(g.coreEnd - 1)) --g.coreEnd;
+        groups.push_back(g);
+        i = j;
+    }
+
+    // Fett und kursiv werden nur umgeschaltet, wenn sich etwas aendert - so
+    // entstehen nie mehrdeutige Folgen wie "****", und hoechstens drei
+    // Sternchen stehen nebeneinander (die der Parser als "**" + "*" liest).
+    bool bold = false, italic = false;
+    for (size_t gi = 0; gi < groups.size(); ++gi) {
+        const Group& g = groups[gi];
+        const TextStyle& s = units[g.begin].style;
+        const bool hasCore = g.coreBegin < g.coreEnd;
+
+        std::string span;
+        if (!s.color.empty()) span += "color:" + s.color + ";";
+        if (!s.background.empty()) span += "background:" + s.background + ";";
+        if (s.size > 0.0f) span += "font-size:" + formatSize(s.size) + "pt;";
+        if (!s.font.empty()) span += "font-family:" + s.font + ";";
+        if (!span.empty()) span.pop_back();
+
+        if (!span.empty()) out += "<span style=\"" + span + "\">";
+        if (s.underline) out += "<u>";
+        if (s.superscript) out += "<sup>";
+        else if (s.subscript) out += "<sub>";
+
+        for (size_t k = g.begin; k < g.coreBegin; ++k) {
+            if (positions) (*positions)[k] = out.size();
+            out += units[k].raw;
+        }
+        if (hasCore) {
+            if (bold != s.bold) {
+                out += "**";
+                bold = s.bold;
+            }
+            if (italic != s.italic) {
+                out += "*";
+                italic = s.italic;
+            }
+            if (s.strike) out += "~~";
+            for (size_t k = g.coreBegin; k < g.coreEnd; ++k) {
+                if (positions) (*positions)[k] = out.size();
+                out += units[k].raw;
+            }
+            if (s.strike) out += "~~";
+
+            // Was braucht das naechste Stueck mit Inhalt? Alles andere wird
+            // hier - vor den Leerzeichen - geschlossen.
+            bool nextBold = false, nextItalic = false;
+            for (size_t gj = gi + 1; gj < groups.size(); ++gj) {
+                if (groups[gj].coreBegin < groups[gj].coreEnd) {
+                    nextBold = units[groups[gj].begin].style.bold;
+                    nextItalic = units[groups[gj].begin].style.italic;
+                    break;
+                }
+            }
+            if (italic && !nextItalic) {
+                out += "*";
+                italic = false;
+            }
+            if (bold && !nextBold) {
+                out += "**";
+                bold = false;
+            }
+        }
+        for (size_t k = hasCore ? g.coreEnd : g.end; k < g.end; ++k) {
+            if (positions) (*positions)[k] = out.size();
+            out += units[k].raw;
+        }
+
+        if (s.superscript) out += "</sup>";
+        else if (s.subscript) out += "</sub>";
+        if (s.underline) out += "</u>";
+        if (!span.empty()) out += "</span>";
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------- Ausgabe
 std::string renderManuscript(const Project& p, const std::string& text, bool keepFormatting) {
     std::string out;
-    bool bold = false;
-    bool italic = false;
-
-    // Beim Export bleiben die Formatzeichen stehen; dort werden sie in echte
-    // Word-Formatierung uebersetzt.
-    auto applyStyle = [&](const ManuscriptToken& t) {
-        if (!keepFormatting) return;
-        if (italic && !t.italic) {
-            out += "*";
-            italic = false;
-        }
-        if (bold != t.bold) {
-            out += "**";
-            bold = t.bold;
-        }
-        if (!italic && t.italic) {
-            out += "*";
-            italic = true;
-        }
-    };
-
     for (const ManuscriptToken& t : parseManuscript(p, text)) {
         switch (t.kind) {
             case ManuscriptToken::Kind::Text:
-                applyStyle(t);
                 out += t.raw;
+                break;
+            case ManuscriptToken::Kind::Markup:
+                // Beim Export bleiben die Formatzeichen stehen - Obsidian und
+                // der Word-Export verstehen sie.
+                if (keepFormatting) out += t.raw;
                 break;
             case ManuscriptToken::Kind::Heading:
                 out += t.raw;
@@ -288,11 +700,9 @@ std::string renderManuscript(const Project& p, const std::string& text, bool kee
                 out += keepFormatting ? "---" : "* * *";
                 break;
             case ManuscriptToken::Kind::Element:
-                applyStyle(t);
                 out += t.resolved ? p.displayName(t.targetId) : t.raw;
                 break;
             case ManuscriptToken::Kind::Value: {
-                applyStyle(t);
                 if (!t.resolved) {
                     out += t.raw;
                     break;
@@ -308,11 +718,11 @@ std::string renderManuscript(const Project& p, const std::string& text, bool kee
                 // Nur organisatorisch: die Marke sagt, an welcher Stelle im Text
                 // die Aktion passiert - im fertigen Text steht sie nicht.
                 break;
+            case ManuscriptToken::Kind::Bookmark:
+            case ManuscriptToken::Kind::Note:
+                // Arbeitsnotizen des Autors gehoeren nicht in die fertige Geschichte.
+                break;
         }
-    }
-    if (keepFormatting) {
-        if (italic) out += "*";
-        if (bold) out += "**";
     }
     return out;
 }
@@ -370,6 +780,24 @@ size_t countWords(const std::string& text) {
         }
     }
     return words;
+}
+
+std::string sanitizeMarkerText(const std::string& text) {
+    std::string out;
+    for (size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (c == '\n' || c == '\r') {
+            out += ' ';
+        } else if (c == '%' && i + 1 < text.size() && text[i + 1] == '%') {
+            out += '%';
+            ++i;
+        } else {
+            out += c;
+        }
+    }
+    // Ein einzelnes '%' am Ende wuerde mit dem Schluss "%%" verschmelzen.
+    while (!out.empty() && out.back() == '%') out.pop_back();
+    return out;
 }
 
 std::vector<size_t> findAll(const std::string& haystack, const std::string& needle,

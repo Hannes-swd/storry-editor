@@ -88,6 +88,9 @@ add_executable(StoryEditor WIN32
     src/ui/UiCommon.cpp
     src/ui/Editor.cpp
     src/ui/Dialogs.cpp
+    src/ui/DocumentView.cpp
+    src/ui/EditingSelfTest.cpp
+    src/ui/Ribbon.cpp
     src/ui/ManuscriptWindow.cpp
     src/ui/TimelineWindow.cpp
     src/ui/GroupManagerWindow.cpp

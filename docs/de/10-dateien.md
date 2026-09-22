@@ -85,24 +85,28 @@ Alternativ legst du in der Vorlage ein Feld vom Typ **File** an
 
 ## 10.5 Als Word‑Datei
 
-**Manuskript → Ansicht → Als Word speichern…**
+**Manuskript → Datei → Als Word**
 oder **Datei → Manuskript als Word (.docx)…**
 
 Was dabei entsteht:
 
 | Im Manuskript | In der Word‑Datei |
 |:--|:--|
-| Projektname | Titel auf der ersten Seite |
+| Projektname | Titel auf der ersten Seite – außer das Manuskript hat selbst einen Titel (`# …`) |
+| `# Titel` | Titel |
 | `## Kapitel 1` | Überschrift 1 |
 | `### Szene` | Überschrift 2 |
 | `@Alice` | `Alice` |
 | `@Alice.age` | die Zahl, die zu dieser Stelle gehört |
-| `**fett**` / `*kursiv*` | echtes **Fett** / *Kursiv* |
+| Fett, kursiv, unterstrichen, durchgestrichen, hoch‑/tiefgestellt | dieselbe Formatierung in Word |
+| Schriftart, Größe, Farbe, Hervorhebung | dieselbe Formatierung in Word |
+| Ausrichtung, Aufzählung, Nummerierung | dieselbe Formatierung in Word |
 | `---` | zentrierte Trennung `* * *` |
 | `#Tag 5, 14:00` | **weg** |
 | `!act:…` | **weg** |
-| Leerzeile | neuer Absatz |
-| Zeilenumbruch im Absatz | weicher Umbruch |
+| Lesezeichen, Kommentare | **weg** |
+| jede Zeile | ein Absatz – wie auf der Seite im Editor |
+| Grundschrift, Zeilenabstand, Ränder, Papierformat | aus **Layout** |
 
 Die Datei ist ein normales `.docx` und lässt sich mit Word, LibreOffice oder Google
 Docs öffnen. Du brauchst kein Word installiert zu haben – das Programm baut das Paket

@@ -74,6 +74,9 @@ void applyPreset(ThemePreset preset) {
         c.edgeColor = rgb(0x70, 0x70, 0x78);
         c.nodeOutline = rgb(0x3A, 0x3A, 0x42);
         c.blockColor = rgb(0x6B, 0x66, 0x8C);
+        c.pageColor = rgb(0xFF, 0xFF, 0xFF);
+        c.pageTextColor = rgb(0x1A, 0x1A, 0x1C);
+        c.workspaceColor = rgb(0xE3, 0xE3, 0xDF);
         setGroupPalette(0.70f, 0.66f);  // kraeftigere Gruppenfarben auf Weiss
     } else {
         // Neutrales Dunkelgrau mit weisser Schrift - ebenfalls ohne Blau.
@@ -95,9 +98,23 @@ void applyPreset(ThemePreset preset) {
         c.edgeColor = rgb(0x9A, 0x9A, 0xA4);
         c.nodeOutline = rgb(0x0C, 0x0C, 0x0E);
         c.blockColor = rgb(0x9B, 0x96, 0xBE);
+        // Das Blatt bleibt hell wie Papier - Schriftfarben im Dokument sollen in
+        // beiden Designs gleich lesbar sein.
+        c.pageColor = rgb(0xEC, 0xEB, 0xE7);
+        c.pageTextColor = rgb(0x1A, 0x1A, 0x1C);
+        c.workspaceColor = rgb(0x0E, 0x0E, 0x10);
         setGroupPalette(0.55f, 0.80f);
     }
     c.groupColors.clear();
+
+    // Dokumentfarben wie in Word: kraeftige Grundtoene fuer die Schrift,
+    // helle Leuchtfarben fuer die Hervorhebung.
+    c.textPalette = {rgb(0xC0, 0x00, 0x00), rgb(0xFF, 0x00, 0x00), rgb(0xFF, 0xC0, 0x00),
+                     rgb(0x92, 0xD0, 0x50), rgb(0x00, 0xB0, 0x50), rgb(0x00, 0xB0, 0xF0),
+                     rgb(0x00, 0x70, 0xC0), rgb(0x00, 0x20, 0x60), rgb(0x70, 0x30, 0xA0),
+                     rgb(0x7F, 0x7F, 0x7F)};
+    c.highlightPalette = {rgb(0xFF, 0xFF, 0x00), rgb(0x00, 0xFF, 0x00), rgb(0x00, 0xFF, 0xFF),
+                          rgb(0xFF, 0x00, 0xFF), rgb(0xFF, 0xC0, 0x80), rgb(0xC0, 0xC0, 0xC0)};
 }
 
 Fonts& fonts() {
@@ -114,6 +131,123 @@ ImFont* fontFor(bool bold, bool italic) {
     if (!wanted && bold) wanted = f.bold;
     if (!wanted && italic) wanted = f.italic;
     return wanted ? wanted : f.regular;
+}
+
+// ------------------------------------------------------------- Schriftarten
+namespace {
+
+struct FamilyFiles {
+    const char* name;
+    const char* files[4];  // normal, fett, kursiv, fett-kursiv
+};
+
+const FamilyFiles kFamilies[] = {
+    {"Georgia", {"georgia.ttf", "georgiab.ttf", "georgiai.ttf", "georgiaz.ttf"}},
+    {"Times New Roman", {"times.ttf", "timesbd.ttf", "timesi.ttf", "timesbi.ttf"}},
+    {"Cambria", {"cambria.ttc", "cambriab.ttf", "cambriai.ttf", "cambriaz.ttf"}},
+    {"Palatino Linotype", {"pala.ttf", "palab.ttf", "palai.ttf", "palabi.ttf"}},
+    {"Book Antiqua", {"BKANT.TTF", "ANTQUAB.TTF", "ANTQUAI.TTF", "ANTQUABI.TTF"}},
+    {"Garamond", {"GARA.TTF", "GARABD.TTF", "GARAIT.TTF", ""}},
+    {"Constantia", {"constan.ttf", "constanb.ttf", "constani.ttf", "constanz.ttf"}},
+    {"Calibri", {"calibri.ttf", "calibrib.ttf", "calibrii.ttf", "calibriz.ttf"}},
+    {"Segoe UI", {"segoeui.ttf", "segoeuib.ttf", "segoeuii.ttf", "segoeuiz.ttf"}},
+    {"Arial", {"arial.ttf", "arialbd.ttf", "ariali.ttf", "arialbi.ttf"}},
+    {"Verdana", {"verdana.ttf", "verdanab.ttf", "verdanai.ttf", "verdanaz.ttf"}},
+    {"Candara", {"Candara.ttf", "Candarab.ttf", "Candarai.ttf", "Candaraz.ttf"}},
+    {"Consolas", {"consola.ttf", "consolab.ttf", "consolai.ttf", "consolaz.ttf"}},
+    {"Courier New", {"cour.ttf", "courbd.ttf", "couri.ttf", "courbi.ttf"}},
+};
+
+struct LoadedFamily {
+    ImFont* fonts[4] = {nullptr, nullptr, nullptr, nullptr};
+    bool requested = false;
+    bool loaded = false;
+};
+
+std::map<std::string, LoadedFamily>& loadedFamilies() {
+    static std::map<std::string, LoadedFamily> m;
+    return m;
+}
+
+std::string fontPath(const char* file) { return std::string("C:/Windows/Fonts/") + file; }
+
+bool fileExists(const std::string& path) { return platform::lastWriteTime(path) != 0; }
+
+const FamilyFiles* findFamily(const std::string& name) {
+    for (const FamilyFiles& f : kFamilies) {
+        if (name == f.name) return &f;
+    }
+    return nullptr;
+}
+
+}  // namespace
+
+const std::vector<std::string>& fontFamilies() {
+    static std::vector<std::string> names;
+    static bool scanned = false;
+    if (!scanned) {
+        scanned = true;
+        for (const FamilyFiles& f : kFamilies) {
+            if (fileExists(fontPath(f.files[0]))) names.push_back(f.name);
+        }
+    }
+    return names;
+}
+
+ImFont* familyFont(const std::string& family, bool bold, bool italic) {
+    if (family.empty()) return fontFor(bold, italic);
+    LoadedFamily& lf = loadedFamilies()[family];
+    if (!lf.loaded) {
+        lf.requested = true;
+        return fontFor(bold, italic);
+    }
+    const int index = bold && italic ? 3 : bold ? 1 : italic ? 2 : 0;
+    if (lf.fonts[index]) return lf.fonts[index];
+    // Fehlt ein Schnitt, nimm den naechstbesten der Familie.
+    if (bold && italic && lf.fonts[1]) return lf.fonts[1];
+    if (lf.fonts[0]) return lf.fonts[0];
+    return fontFor(bold, italic);
+}
+
+uint64_t& fontGenerationCounter() {
+    static uint64_t g = 1;
+    return g;
+}
+
+uint64_t fontGeneration() { return fontGenerationCounter(); }
+
+void loadPendingFonts() {
+    ImGuiIO& io = ImGui::GetIO();
+    for (auto& kv : loadedFamilies()) {
+        LoadedFamily& lf = kv.second;
+        if (!lf.requested || lf.loaded) continue;
+        lf.loaded = true;
+        ++fontGenerationCounter();
+        const FamilyFiles* files = findFamily(kv.first);
+        if (!files) continue;
+        for (int k = 0; k < 4; ++k) {
+            if (!files->files[k] || !files->files[k][0]) continue;
+            const std::string path = fontPath(files->files[k]);
+            if (!fileExists(path)) continue;
+            lf.fonts[k] = io.Fonts->AddFontFromFileTTF(path.c_str(), settings().fontSize);
+        }
+    }
+}
+
+void pageSizeCm(int format, float* width, float* height) {
+    switch (format) {
+        case 1: *width = 14.8f; *height = 21.0f; break;    // A5
+        case 2: *width = 21.59f; *height = 27.94f; break;  // Letter
+        default: *width = 21.0f; *height = 29.7f; break;   // A4
+    }
+}
+
+const char* pageFormatName(int format) {
+    switch (format) {
+        case 1: return "A5";
+        case 2: return "Letter";
+        default: return "A4";
+    }
 }
 
 ImU32 u32(const ImVec4& c, float alphaScale) {
@@ -241,6 +375,18 @@ bool save() {
                      {"max_gap", s.timelineMaxGapPx},
                      {"compress_gaps", s.timelineCompressGaps}};
     j["autosave"] = s.autosave;
+    j["document"] = {{"font", s.docFont},
+                     {"font_size", s.docFontSize},
+                     {"line_spacing", s.docLineSpacing},
+                     {"margin_cm", s.docMarginCm},
+                     {"page_format", s.docPageFormat},
+                     {"page_view", s.docPageView},
+                     {"zoom", s.docZoom},
+                     {"ruler", s.docShowRuler},
+                     {"outline", s.docShowOutline},
+                     {"marks", s.docShowMarks},
+                     {"ribbon_collapsed", s.docRibbonCollapsed},
+                     {"ribbon_tab", s.docRibbonTab}};
     j["last_vault"] = s.lastVault;
     j["last_project_name"] = s.lastProjectName;
     j["windows"] = {{"manuscript", s.showManuscript}, {"timeline", s.showTimeline}, {"groups", s.showGroups},
@@ -268,6 +414,9 @@ bool save() {
     jc["edge"] = colorToJson(c.edgeColor);
     jc["node_outline"] = colorToJson(c.nodeOutline);
     jc["block"] = colorToJson(c.blockColor);
+    jc["page"] = colorToJson(c.pageColor);
+    jc["page_text"] = colorToJson(c.pageTextColor);
+    jc["workspace"] = colorToJson(c.workspaceColor);
     json overrides = json::object();
     for (const auto& kv : c.groupColors) overrides[kv.first] = colorToJson(kv.second);
     jc["group_overrides"] = overrides;
@@ -306,6 +455,21 @@ bool load() {
         s.timelineCompressGaps = t.value("compress_gaps", s.timelineCompressGaps);
     }
     s.autosave = j.value("autosave", s.autosave);
+    if (j.contains("document")) {
+        const json& d = j["document"];
+        s.docFont = d.value("font", s.docFont);
+        s.docFontSize = std::clamp(d.value("font_size", s.docFontSize), 6.0f, 72.0f);
+        s.docLineSpacing = std::clamp(d.value("line_spacing", s.docLineSpacing), 0.8f, 3.0f);
+        s.docMarginCm = std::clamp(d.value("margin_cm", s.docMarginCm), 0.5f, 6.0f);
+        s.docPageFormat = std::clamp(d.value("page_format", s.docPageFormat), 0, 2);
+        s.docPageView = d.value("page_view", s.docPageView);
+        s.docZoom = std::clamp(d.value("zoom", s.docZoom), 0.3f, 4.0f);
+        s.docShowRuler = d.value("ruler", s.docShowRuler);
+        s.docShowOutline = d.value("outline", s.docShowOutline);
+        s.docShowMarks = d.value("marks", s.docShowMarks);
+        s.docRibbonCollapsed = d.value("ribbon_collapsed", s.docRibbonCollapsed);
+        s.docRibbonTab = std::clamp(d.value("ribbon_tab", s.docRibbonTab), 0, 5);
+    }
     s.lastVault = j.value("last_vault", s.lastVault);
     s.lastProjectName = j.value("last_project_name", s.lastProjectName);
     if (j.contains("windows")) {
@@ -341,6 +505,9 @@ bool load() {
         c.edgeColor = colorFromJson(jc.value("edge", json()), c.edgeColor);
         c.nodeOutline = colorFromJson(jc.value("node_outline", json()), c.nodeOutline);
         c.blockColor = colorFromJson(jc.value("block", json()), c.blockColor);
+        c.pageColor = colorFromJson(jc.value("page", json()), c.pageColor);
+        c.pageTextColor = colorFromJson(jc.value("page_text", json()), c.pageTextColor);
+        c.workspaceColor = colorFromJson(jc.value("workspace", json()), c.workspaceColor);
         c.groupColors.clear();
         if (jc.contains("group_overrides") && jc["group_overrides"].is_object()) {
             for (auto it = jc["group_overrides"].begin(); it != jc["group_overrides"].end(); ++it)

@@ -34,6 +34,10 @@ public:
     std::string focusActionId;    // actions panel + timeline scroll to it
     bool focusTimeline = false;
 
+    // Das Schreibfeld des Manuskripts hat die Tastatur: Strg+Z/Y gehoeren
+    // dann seiner eigenen Geschichte, nicht dem Projekt. Jeden Frame neu.
+    bool manuscriptKeyboard = false;
+
     std::vector<std::string> droppedFiles;  // filled by WM_DROPFILES
     bool quitRequested = false;
     bool resetLayoutRequested = false;

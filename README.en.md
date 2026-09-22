@@ -77,7 +77,7 @@ or jump straight to what you need.
 | | |
 |:--|:--|
 | **[📦 1 · Getting started](docs/en/01-getting-started.md)**<br>Build, start, create your first project. What is a "vault"? | **[🪟 2 · The program window](docs/en/02-overview.md)**<br>What each window does, how to move them, how to bring a closed one back. |
-| **[✍️ 3 · Writing](docs/en/03-manuscript.md)**<br>The heart of it. Type text, insert characters, chapters, bold/italic, find & replace. | **[👥 4 · Characters, places, things](docs/en/04-groups.md)**<br>Create groups and elements, templates and field types. |
+| **[✍️ 3 · Writing](docs/en/03-manuscript.md)**<br>The heart of it – like Word: ribbon, pages, fonts, colours, lists, comments, inserting characters, find & replace. | **[👥 4 · Characters, places, things](docs/en/04-groups.md)**<br>Create groups and elements, templates and field types. |
 
 ### The time system
 

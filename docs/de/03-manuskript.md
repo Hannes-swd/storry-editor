@@ -6,15 +6,20 @@
 
 # ✍️ Kapitel 3 · Schreiben
 
-> **Das wichtigste Kapitel.** Hier passiert die eigentliche Arbeit. Am Ende kannst du
-> Text schreiben, Figuren einsetzen, Werte einbauen, gliedern, hervorheben und suchen –
-> **ohne ein einziges Sonderzeichen auswendig zu lernen.**
+> **Das wichtigste Kapitel.** Hier passiert die eigentliche Arbeit. Das Manuskript sieht
+> aus und bedient sich wie Word: ein Blatt Papier, darüber das Menüband, unten die
+> Statusleiste. Am Ende kannst du Text schreiben und formatieren, Figuren und Werte
+> einsetzen, gliedern, Notizen anhängen und suchen – **ohne ein einziges Sonderzeichen
+> auswendig zu lernen.**
 
 ---
 
 ## 3.1 Erstmal: einfach schreiben
 
-Das Manuskript ist ein ganz normales Textfeld. Klick hinein und tipp los.
+![Das Manuskript-Fenster](../bilder/manuskript-seite.png)
+
+Klick auf das Blatt und tipp los. Was du siehst, ist das, was du bekommst:
+Überschriften sind groß, Fettes ist fett, Farben sind farbig.
 
 ```
  Tag 1. Alice kam zurück, und die Stadt war kleiner, als sie sie
@@ -22,55 +27,118 @@ Das Manuskript ist ein ganz normales Textfeld. Klick hinein und tipp los.
  erkannte.
 ```
 
-Das funktioniert. Aber das Programm weiß dabei nichts über Alice und Bob –
-für es sind das nur Buchstaben. Der nächste Schritt ändert das.
-
----
-
-## 3.2 Die Leiste
-
-Alles, was über reinen Text hinausgeht, setzt die Leiste oben für dich ein.
-Sie ist in vier Gruppen geteilt:
-
-```
-┌──── was du gerade tust ────┬──── was in den Text kommt ────┬─ Ansicht ─┬── wo du stehst ──┐
-│                            │                               │           │                  │
-│  ◉ Schreiben   ○ Lesen     │  Einfügen  Format  Suchen     │ Ansicht ? │ Zeit: Tag 5 …   │
-│                            │                               │           │ 96 Wörter        │
-│                            │                               │           │ ● Gespeichert    │
-└────────────────────────────┴───────────────────────────────┴───────────┴──────────────────┘
-```
-
-| Gruppe | Wofür |
+| Taste | Wirkung |
 |:--|:--|
-| **Schreiben / Lesen** | Umschalten zwischen Bearbeiten und der fertigen Lesefassung |
-| **Einfügen** | Figuren, Werte, Ereignisse und Zeitpunkte in den Text setzen |
-| **Format** | Kapitel, Szenen, Fett, Kursiv |
-| **Suchen** | Stellen finden und ersetzen |
-| **Ansicht** | Gliederung ein/aus, Marken zeigen, als Word speichern |
-| **?** | Ein kleines Hilfefenster, das genau das hier zusammenfasst |
-| **rechts** | Zeitpunkt an der Cursorstelle, Wortzahl, Speicherstand |
+| <kbd>Enter</kbd> | Neuer Absatz (in einer Liste: neuer Punkt, auf einem leeren Punkt: Liste beenden) |
+| <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Pos1</kbd> <kbd>Ende</kbd>, <kbd>Bild↑</kbd> <kbd>Bild↓</kbd> | Cursor bewegen – mit <kbd>Umschalt</kbd> markieren, mit <kbd>Strg</kbd> wortweise |
+| Doppelklick / Dreifachklick | Wort / ganzen Absatz markieren |
+| <kbd>Strg</kbd>+<kbd>A</kbd> | Alles markieren |
+| <kbd>Strg</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd> | Ausschneiden, Kopieren, Einfügen – innerhalb des Manuskripts bleibt die Formatierung erhalten |
+| <kbd>Strg</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd> | Rückgängig / Wiederholen |
+| <kbd>Strg</kbd>+Mausrad | Zoomen |
+| Rechtsklick | Kontextmenü mit den häufigsten Befehlen |
 
-> 💡 Alles wird **an der Stelle eingesetzt, an der dein Cursor stand**. Nach dem Klick
-> springt die Eingabe von selbst dorthin zurück – du kannst einfach weiterschreiben.
+Das funktioniert schon. Aber das Programm weiß dabei nichts über Alice und Bob –
+für es sind das nur Buchstaben. Abschnitt 3.4 ändert das.
 
 ---
 
-## 3.3 Eine Figur einsetzen
+## 3.2 Das Menüband
+
+![Die Registerkarten](../bilder/manuskript-register.png)
+
+Oben links stehen **Speichern**, **Rückgängig** und **Wiederholen**, daneben die
+Registerkarten. Das Pfeilchen ganz rechts klappt das Band ein und aus.
+
+| Registerkarte | Was darin steht |
+|:--|:--|
+| **Datei** | Speichern, als Word speichern, Hilfe, Einstellungen |
+| **Start** | Zwischenablage, Schriftart, Absatz, Formatvorlagen, Suchen |
+| **Einfügen** | Figuren, Werte, Aktionen, Zeitpunkte, Szenenwechsel, Lesezeichen, Kommentare |
+| **Layout** | Seitenränder, Papierformat, Zeilenabstand, Grundschrift, Seiten oder Endlos |
+| **Überprüfen** | Kommentare anlegen und durchgehen, Lesezeichen, Wörter zählen |
+| **Ansicht** | Lesemodus, Lineal, Navigationsbereich, Zoom, geteilte Ansicht, Fokus |
+
+> 💡 Das Programm merkt sich, welche Registerkarte zuletzt offen war.
+
+---
+
+## 3.3 Formatieren
+
+![Die Registerkarte Start](../bilder/manuskript-format.png)
+
+Wie in Word: **erst markieren, dann klicken.** Ohne Markierung gilt das Format für das,
+was du als Nächstes tippst.
+
+### Schriftart
+
+| Knopf | Wirkung |
+|:--|:--|
+| **Georgia ▾** | Schriftart der Markierung |
+| **12 ▾** | Schriftgrad in Punkt – eintippen oder aus der Liste wählen |
+| **A˄ A˅** | Schrift eine Stufe größer / kleiner |
+| **A mit Radierer** | Formatierung entfernen |
+| **F K U ab** | Fett, kursiv, unterstrichen, durchgestrichen |
+| **x₂ x²** | Tief- und hochgestellt |
+| **Stift ▾** | Texthervorhebung (Leuchtmarker-Farbe) |
+| **A ▾** | Schriftfarbe – aus der Palette oder unter „Weitere Farben…" frei gewählt |
+
+Die Knöpfe zeigen an, was an der Cursorstelle gilt – steht der Cursor in fettem Text,
+ist **F** hervorgehoben.
+
+### Absatz
+
+| Knopf | Wirkung |
+|:--|:--|
+| **•≡** / **1≡** | Aufzählung / Nummerierung – die Nummern zählen von selbst weiter |
+| **Ausrichtung** | Linksbündig, zentriert, rechtsbündig, Blocksatz |
+| **Zeilenabstand ▾** | 1,0 bis 3,0 – gilt für das ganze Manuskript |
+| **¶** | Zeit‑ und Aktionsmarken auch im Lesemodus anzeigen |
+| **✱✱✱** | Szenenwechsel einfügen |
+
+### Formatvorlagen
+
+| Vorlage | Wofür | In Word |
+|:--|:--|:--|
+| **Standard** | Fließtext | Standard |
+| **Titel** | Titel des Werks | Titel |
+| **Kapitel** | Kapitelüberschrift – erscheint im Navigationsbereich | Überschrift 1 |
+| **Szene** | Szenenüberschrift – eingerückt im Navigationsbereich | Überschrift 2 |
+
+Ein Klick formatiert den ganzen Absatz, in dem der Cursor steht.
+
+### Tastenkürzel
+
+| Kürzel | Wirkung |
+|:--|:--|
+| <kbd>Strg</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd> | Fett / kursiv / unterstrichen |
+| <kbd>Strg</kbd>+<kbd>+</kbd> / <kbd>Strg</kbd>+<kbd>#</kbd> | Hochgestellt / tiefgestellt |
+| <kbd>Strg</kbd>+<kbd>Umschalt</kbd>+<kbd>></kbd> / <kbd>Strg</kbd>+<kbd><</kbd> | Schrift größer / kleiner |
+| <kbd>Strg</kbd>+<kbd>Leertaste</kbd> | Formatierung entfernen |
+| <kbd>Strg</kbd>+<kbd>L</kbd> / <kbd>E</kbd> / <kbd>R</kbd> / <kbd>J</kbd> | Links / zentriert / rechts / Blocksatz |
+
+> 🛟 **Kein Chaos möglich:** Das Programm schreibt die Formatierung selbst in die Datei
+> und hält sie dabei immer vollständig – eine halbe Hervorhebung, die den Rest des
+> Buches fett färbt, kann nicht entstehen.
+
+---
+
+## 3.4 Eine Figur einsetzen
 
 Statt „Alice" einfach hinzutippen, setzt du eine **Marke**. Dann weiß das Programm,
 dass hier *die* Alice gemeint ist.
 
+![Die Registerkarte Einfügen](../bilder/manuskript-einfuegen.png)
+
 ### So geht's
 
-![Das Einfügen-Menü](../bilder/manuskript-einfuegen.png)
-
 1. Cursor an die Stelle setzen, wo der Name hin soll
-2. **Einfügen → Element (Figur, Ort, Ding)**
+2. **Einfügen → Element ▾**
 3. Oben ins Suchfeld tippen, wenn die Liste lang ist
 4. Auf den Namen klicken
 
 Im Text steht danach `@Alice` – mit einem farbigen Untergrund in der Farbe ihrer Gruppe.
+Folgt direkt ein Wort, setzt das Programm ein Leerzeichen dazwischen.
 
 ### Schneller: einfach `@` tippen
 
@@ -85,21 +153,20 @@ weiter. Unter dem Cursor klappt eine Vorschlagsliste auf:
 | <kbd>Esc</kbd> | Liste wegklicken |
 
 > 💡 <kbd>Enter</kbd> macht weiterhin einen Absatz, solange du nichts ausgewählt hast.
-> Nach einem Satzende wie „… vor der @Castle." kommst du also ganz normal in die
-> nächste Zeile.
+> Nur hineinklicken öffnet die Liste nicht – sie erscheint erst, wenn du tippst.
 
 ### Was du davon hast
 
 | | |
 |:--|:--|
-| 🎨 **Sichtbar** | Die Marke hat den Untergrund der Gruppenfarbe – Figuren grün, Orte blau, Dinge orange |
-| 🔗 **Klickbar** | Klick öffnet die Figur im Details‑Fenster |
+| 🎨 **Sichtbar** | Die Marke hat den Untergrund der Gruppenfarbe |
+| 🔗 **Klickbar** | <kbd>Strg</kbd>+Klick öffnet die Figur im Details‑Fenster, beim Überfahren steht der Pfad da |
 | 🔴 **Tippfehlersicher** | Ein Name, den es nicht gibt, wird **rot** – du siehst den Fehler sofort |
 | 📊 **Auswertbar** | Die Timeline weiß jetzt, dass Alice in dieser Szene vorkommt |
 
 ---
 
-## 3.4 Einen Wert einsetzen
+## 3.5 Einen Wert einsetzen
 
 Das ist der Trick, für den es das Programm gibt.
 
@@ -109,79 +176,59 @@ gilt – in Kapitel 1 die 27, in Kapitel 9 die 28.
 
 ### So geht's
 
-1. **Einfügen → Wert eines Elements**
+1. **Einfügen → Wert ▾**
 2. Auf die Figur zeigen – ein Untermenü klappt auf mit **allen ihren Feldern**
 3. Neben jedem Feld steht gleich der Wert, der hier gerade gilt
 4. Feld anklicken
 
 ```
-  Einfügen ▸ Wert eines Elements ▸ ● Alice ▸ ┌───────────────────────────┐
-                                             │ name       Alice          │
-                                             │ age        27             │
-                                             │ status     Alive          │
-                                             │ backstory  (leer)         │
-                                             └───────────────────────────┘
+  Einfügen ▸ Wert ▸ ● Alice ▸ ┌───────────────────────────┐
+                              │ name       Alice          │
+                              │ age        27             │
+                              │ status     Alive          │
+                              │ backstory  (leer)         │
+                              └───────────────────────────┘
 ```
 
-Im Text steht danach `@Alice.age`. Wenn das Feld leer ist oder nicht existiert, setzt
-das Programm ersatzweise den Namen ein – es entsteht also nie eine Lücke im Text.
+Im Text steht danach `@Alice.age`; beim Überfahren siehst du den aktuellen Wert. Wenn
+das Feld leer ist oder nicht existiert, setzt das Programm ersatzweise den Namen ein –
+es entsteht also nie eine Lücke im Text.
 
 > 📖 Warum derselbe Ausdruck zwei verschiedene Zahlen ergibt, steht in
 > **[Kapitel 5 · Wie die Zeit funktioniert](05-zeit.md)**.
 
 ---
 
-## 3.5 Gliedern und hervorheben
+## 3.6 Lesezeichen und Kommentare
 
-![Das Format-Menü](../bilder/manuskript-format.png)
+Zwei Werkzeuge nur für dich – im fertigen Text und in der Word‑Datei stehen sie nie.
 
-| Menüpunkt | Was es macht | Im Text |
+| | So geht's | Im Text |
 |:--|:--|:--|
-| **Kapitel** | Große Überschrift, erscheint links in der Gliederung | `## Neues Kapitel` |
-| **Szene** | Kleinere Überschrift, eingerückt in der Gliederung | `### Neue Szene` |
-| **Szenenwechsel** | Trennung mitten im Kapitel | `---` |
-| **Fett** <kbd>Strg</kbd>+<kbd>B</kbd> | Hebt markierten Text hervor | `**so**` |
-| **Kursiv** <kbd>Strg</kbd>+<kbd>I</kbd> | dito | `*so*` |
+| 🚩 **Lesezeichen** | **Einfügen → Lesezeichen** (oder **Überprüfen**), Namen eingeben | Fähnchen; der Name steht im Navigationsbereich, **Überprüfen → Gehe zu** springt hin |
+| 💬 **Kommentar** | **Einfügen → Kommentar**, **Überprüfen → Neuer Kommentar** oder Rechtsklick | Sprechblase; Überfahren zeigt den Text, Klick bearbeitet oder löscht ihn |
 
-**Fett und Kursiv:** Markier erst ein Wort und drück dann <kbd>Strg</kbd>+<kbd>B</kbd> –
-die Zeichen legen sich um die Markierung. Ohne Markierung landen beide Zeichen am
-Cursor und du schreibst dazwischen weiter.
-
-Im Schreibmodus siehst du einen zarten grauen Untergrund, der zeigt, wie weit die
-Hervorhebung reicht. Im Lesemodus und in der Word‑Datei wird daraus **echtes Fett**.
-
-> 🛟 **Kein Chaos möglich:** Eine vergessene Hervorhebung endet spätestens am Absatz –
-> ein einzelnes Sternchen färbt also nie den Rest des Buches ein. Und ein `*` mitten
-> im Satz („3 * 4") bleibt ganz normaler Text.
+Mit **Überprüfen → Vorheriger / Nächster** gehst du alle Kommentare der Reihe nach durch.
+Ist einer markiert, lässt er sich dort auch bearbeiten und löschen.
 
 ---
 
-## 3.6 Die Gliederung links
+## 3.7 Der Navigationsbereich
 
-Jedes Kapitel, jede Szene und jeder Zeitpunkt taucht links in der Gliederung auf.
+Links steht die Gliederung deines Textes: Titel und Kapitel fett, Szenen eingerückt,
+dazu jeder Zeitpunkt und jedes Lesezeichen. Ein Klick springt an die Stelle.
+Darunter klappt die Liste aller **Kommentare** auf.
 
-```
- ┌──────────────────────┐
- │ Gliederung           │
- ├──────────────────────┤
- │ Kapitel 1 - Rückkehr │ ← Klick springt an die Stelle im Text
- │ - Tag 1, 09:00       │
- │ Kapitel 2 - Der Fund │
- │ - Tag 5, 14:00       │
- │ - Tag 11, 08:00      │
- └──────────────────────┘
-```
-
-Ausblenden kannst du sie über **Ansicht → Gliederung**.
+Aus- und einblenden kannst du ihn über **Ansicht → Navigationsbereich**.
 
 ---
 
-## 3.7 Suchen und Ersetzen
+## 3.8 Suchen und Ersetzen
 
 ![Die Suchleiste](../bilder/manuskript-suchen.png)
 
-**Suchen** in der Leiste (oder <kbd>Strg</kbd>+<kbd>F</kbd>) blendet eine Leiste über
-dem Text ein.
+**Start → Suchen** (<kbd>Strg</kbd>+<kbd>F</kbd>) bzw. **Ersetzen**
+(<kbd>Strg</kbd>+<kbd>H</kbd>) blendet eine Leiste über der Seite ein.
 
 | | |
 |:--|:--|
@@ -192,35 +239,60 @@ dem Text ein.
 | **Gross/klein** | Groß‑ und Kleinschreibung beachten |
 | **Ersetzen** | Nur den angesteuerten Treffer |
 | **Alle ersetzen** | Alle auf einmal – lässt sich mit <kbd>Strg</kbd>+<kbd>Z</kbd> rückgängig machen |
-
-Der Treffer, zu dem du springst, wird im Text markiert – du kannst also sofort
-weiterschreiben.
+| <kbd>Esc</kbd> | Leiste schließen |
 
 ---
 
-## 3.8 Lesen statt schreiben
+## 3.9 Seite, Zoom und Ansicht
+
+| Wo | Was |
+|:--|:--|
+| **Layout → Seitenränder / Format** | Rand (schmal bis breit) und Papier (A4, A5, Letter) |
+| **Layout → Zeilenabstand, Grundschrift, Größe** | Gilt für das ganze Manuskript – auch in der Word‑Datei |
+| **Layout / Ansicht → Seiten oder Endlos** | Einzelne Blätter wie auf Papier oder ein durchgehendes Blatt über die ganze Breite |
+| **Ansicht → Lineal** | Zentimeter‑Lineal mit den Rändern über der Seite |
+| **Ansicht → Zoom** | 50 % bis 300 %, „Eine Seite", „Seitenbreite" – oder <kbd>Strg</kbd>+Mausrad |
+| **Ansicht → Teilen** | Zwei Stellen desselben Textes übereinander, z. B. oben Kapitel 1 lesen, unten Kapitel 12 schreiben. Die Trennlinie lässt sich ziehen |
+| **Ansicht → Fokus** | Nur noch das Blatt – Menüband, Lineal und Navigationsbereich verschwinden |
+
+Die **Statusleiste** unten zeigt:
+
+```
+ Seite 3 von 12 · 4 210 Wörter · Zeit: Tag 5, 14:00 · ● Gespeichert      ⛶ 📖 ▤ 🌐  − ━━●━━ +  100 %
+```
+
+| Anzeige | Bedeutung |
+|:--|:--|
+| **Seite x von y** | Wo der Cursor steht |
+| **Wörter** | Klick öffnet die Statistik (Seiten, Wörter, Zeichen, Absätze, Kapitel); mit Markierung „12 von 4 210 Wörtern" |
+| **Zeit: …** | Der Zeitpunkt der Geschichte an der Cursorstelle – Klick stellt die Zeit ab hier weiter |
+| **Gespeichert** | Siehe 3.11 |
+| rechts | Fokus, Lesemodus, Seiten, Endlos und der Zoom |
+
+---
+
+## 3.10 Lesen statt schreiben
 
 ![Der Lesemodus](../bilder/manuskript-lesen.png)
 
-Schalt oben auf **Lesen** um. Derselbe Text, aber:
+**Ansicht → Lesemodus** (oder das Buch‑Symbol unten rechts) zeigt den fertigen Text:
 
 | | Schreiben | Lesen |
 |:--|:--|:--|
-| Marken | `@Alice`, `#Tag 5, 14:00` sichtbar | verschwunden |
-| Namen | als Marke | eingesetzt |
+| Namen | als Marke `@Alice` | eingesetzt |
 | Werte | `@Alice.age` | die Zahl, z. B. `27` |
-| Fett/Kursiv | Sternchen sichtbar | echte Schrift |
-| Überschriften | `## Kapitel 1` | groß und farbig |
-| Klicken | Text bearbeiten | Marke anklicken öffnet die Figur |
+| Zeit‑ und Aktionsmarken | sichtbar | nur mit **¶ Marken** |
+| Lesezeichen, Kommentare | sichtbar | verschwunden |
+| Klicken | Text bearbeiten | ein eingesetzter Name öffnet die Figur |
 
-Zur Orientierung kannst du dir die Zeit‑ und Ereignismarken einblenden lassen:
-**Ansicht → Marken zeigen**. In der fertigen Word‑Datei stehen sie nie.
+Die Formatierung sieht in beiden Modi gleich aus. In der Word‑Datei steht der Text
+genau so wie im Lesemodus.
 
 ---
 
-## 3.9 Speichern
+## 3.11 Speichern
 
-Rechts in der Leiste siehst du immer den Stand:
+Unten in der Statusleiste siehst du immer den Stand:
 
 | Anzeige | Bedeutung |
 |:--|:--|
@@ -229,23 +301,25 @@ Rechts in der Leiste siehst du immer den Stand:
 
 Normalerweise musst du nichts tun: nach einer kurzen Tipp‑Pause (spätestens nach fünf
 Sekunden) schreibt das Programm von selbst. Wenn du **Ansicht → Automatisch speichern**
-ausschaltest, passiert das nur noch auf <kbd>Strg</kbd>+<kbd>S</kbd>, per Klick auf den
-gelben Knopf oder beim Schließen.
+im Hauptmenü ausschaltest, passiert das nur noch auf <kbd>Strg</kbd>+<kbd>S</kbd>, per
+Klick auf den gelben Knopf, über das Diskettensymbol oben links oder beim Schließen.
 
 ---
 
-## 3.10 Die eingebaute Hilfe
+## 3.12 Die eingebaute Hilfe
 
 ![Das Hilfefenster](../bilder/manuskript-hilfe.png)
 
-Das **?** in der Leiste öffnet eine Kurzfassung dieses Kapitels – praktisch, wenn du
+**Datei → Hilfe** öffnet eine Kurzfassung dieses Kapitels – praktisch, wenn du
 mitten im Schreiben nicht weißt, wo etwas war.
 
 ---
 
 ## 📋 Was am Ende wirklich in der Datei steht
 
-Du musst dir das nicht merken – die Leiste setzt es ein. Aber falls du mal reinschaust:
+Du musst dir das nicht merken – das Menüband setzt es ein. Aber falls du mal
+reinschaust (die Datei ist `Manuscript/manuscript.md` im Vault). Die Formate sind so
+gewählt, dass auch Obsidian sie darstellt:
 
 | Im Text | Bedeutung |
 |:--|:--|
@@ -253,21 +327,29 @@ Du musst dir das nicht merken – die Leiste setzt es ein. Aber falls du mal rei
 | `@Alice.age` | Wert des Feldes zu diesem Zeitpunkt |
 | `@Characters/Main/Alice` | Voller Pfad – falls zwei Elemente gleich heißen |
 | `#Tag 5, 14:00` | Ab hier gilt dieser Zeitpunkt |
-| `## Kapitel 1` | Überschrift |
-| `### Szene` | Unterüberschrift |
-| `**fett**` `*kursiv*` | Hervorhebung |
+| `# Titel` · `## Kapitel` · `### Szene` | Überschriften |
+| `**fett**` `*kursiv*` `~~durch~~` | Hervorhebung |
+| `<u>…</u>` `<sup>…</sup>` `<sub>…</sub>` | Unterstrichen, hoch‑, tiefgestellt |
+| `<span style="color:#C00000;background:#FFFF00;font-size:14pt;font-family:Georgia">…</span>` | Farbe, Hervorhebung, Größe, Schriftart |
+| `- Punkt` · `1. Punkt` | Aufzählung, Nummerierung |
+| `…%%center%%` am Zeilenende | Ausrichtung (`center`, `right`, `justify`) |
+| `%%bm:Name%%` | Lesezeichen |
+| `%%note:Text%%` | Kommentar |
 | `---` | Szenenwechsel |
 | `!act:…` | Verknüpftes Ereignis – im fertigen Text unsichtbar |
+
+Jede Zeile der Datei ist ein Absatz auf der Seite.
 
 ---
 
 ## ✅ Kurz gesagt
 
-- Schreib einfach los – wie in jedem Textprogramm
-- **Einfügen** setzt Figuren, Werte, Ereignisse und Zeitpunkte ein; **Format** gliedert und hebt hervor
-- `@` tippen ist die Abkürzung für „Figur einsetzen"
-- <kbd>Strg</kbd>+<kbd>F</kbd> findet Stellen, <kbd>Strg</kbd>+<kbd>B</kbd>/<kbd>I</kbd> hebt hervor
-- **Lesen** zeigt den fertigen Text, das **?** erklärt alles nochmal kurz
+- Schreib einfach los – es sieht aus und fühlt sich an wie Word
+- **Start** formatiert: markieren, dann klicken – ohne Markierung gilt es für das nächste Getippte
+- **Einfügen** setzt Figuren, Werte, Ereignisse und Zeitpunkte ein; `@` tippen ist die Abkürzung
+- Lesezeichen und Kommentare sind nur für dich, der **Navigationsbereich** zeigt die Gliederung
+- **Layout** und **Ansicht** bestimmen Seite, Zoom, Lineal, geteilte Ansicht und Fokus
+- Der **Lesemodus** zeigt den fertigen Text, **Datei → Hilfe** erklärt alles nochmal kurz
 
 ---
 

@@ -38,13 +38,13 @@ Nur eine **Zeitmarke** bewegt die Uhr.
 
 ## 5.2 Wo du siehst, wann du bist
 
-Rechts in der Manuskript‑Leiste steht immer der Zeitpunkt, an dem die Geschichte
-**dort steht, wo dein Cursor ist**:
+In der Statusleiste unter dem Manuskript steht immer der Zeitpunkt, an dem die
+Geschichte **dort steht, wo dein Cursor ist**:
 
 ```
-                                    ┌──────────────────────┐
-  … Ansicht  ?                      │ Zeit: Tag 5, 14:00   │  ← anklickbar
-                                    └──────────────────────┘
+            ┌──────────────────────┐
+  Seite 1 … │ Zeit: Tag 5, 14:00   │ ● Gespeichert   ← anklickbar
+            └──────────────────────┘
 ```
 
 Klick den Cursor an eine andere Stelle im Text – die Anzeige ändert sich mit.
@@ -53,7 +53,7 @@ Klick den Cursor an eine andere Stelle im Text – die Anzeige ändert sich mit.
 
 ## 5.3 Die Zeit weiterstellen
 
-Klick auf die Anzeige (oder **Einfügen → Zeitpunkt weiterstellen**):
+Klick auf die Anzeige (oder **Einfügen → Zeitpunkt**):
 
 ```
 ┌─ Zeitpunkt ──────────────────────────────────────────────┐

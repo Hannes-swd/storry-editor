@@ -16,10 +16,22 @@
 
 namespace se {
 
+// Seite und Grundschrift - der Editor gibt hier seine Einstellungen mit.
+struct DocxOptions {
+    std::string font = "Georgia";
+    float sizePt = 12.0f;
+    float lineSpacing = 1.15f;
+    float marginCm = 2.5f;
+    float pageWidthCm = 21.0f;
+    float pageHeightCm = 29.7f;
+};
+
 // Baut das komplette .docx im Speicher (auch fuer den Selbsttest).
-std::string buildManuscriptDocx(const Project& p, const std::string& title);
+std::string buildManuscriptDocx(const Project& p, const std::string& title,
+                               const DocxOptions& options = DocxOptions());
 
 // Schreibt das Manuskript nach `path`. Gibt bei Fehlern false zurueck.
-bool exportManuscriptDocx(const Project& p, const std::string& path, std::string* err);
+bool exportManuscriptDocx(const Project& p, const std::string& path, std::string* err,
+                          const DocxOptions& options = DocxOptions());
 
 }  // namespace se

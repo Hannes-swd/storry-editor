@@ -461,6 +461,128 @@ void testManuscriptFormatting(Report& r) {
     r.check(findAll("aaaa", "aa", false).size() == 2, "find: hits do not overlap");
 }
 
+// Das Menueband schreibt neue Formate in den Text - der Parser muss sie lesen,
+// der Serializer sie verlustfrei zurueckschreiben.
+void testManuscriptRichText(Report& r) {
+    Project p;
+    Group& chars = p.addGroup("Characters", "");
+    p.addElement("Alice", chars.id);
+
+    auto styleOf = [&](const std::string& text, const std::string& word) {
+        for (const ManuscriptToken& t : parseManuscript(p, text)) {
+            if ((t.kind == ManuscriptToken::Kind::Text || t.kind == ManuscriptToken::Kind::Element) &&
+                t.raw.find(word) != std::string::npos)
+                return t.style;
+        }
+        return TextStyle();
+    };
+
+    const std::string text =
+        "Ein <u>unter</u> und ~~weg~~ mit x<sup>2</sup> und H<sub>2</sub>O und "
+        "<span style=\"color:#C00000;background:#FFFF00;font-size:14pt;font-family:Georgia\">rot</span> fertig.";
+    r.check(styleOf(text, "unter").underline, "rich: underline recognised");
+    r.check(styleOf(text, "weg").strike, "rich: strike-through recognised");
+    r.check(styleOf(text, "2").superscript || styleOf(text, "2").subscript, "rich: raised/lowered text");
+    const TextStyle red = styleOf(text, "rot");
+    r.check(red.color == "#C00000" && red.background == "#FFFF00" && red.size == 14.0f && red.font == "Georgia",
+            "rich: span colour, highlight, size and font");
+    r.check(styleOf(text, "fertig").plain(), "rich: span ends at the closing tag");
+    r.check(renderManuscript(p, text) == "Ein unter und weg mit x2 und H2O und rot fertig.",
+            "rich: markup gone in the finished text");
+    r.check(renderManuscript(p, text, true) == text, "rich: markup kept for the reading copy");
+
+    // Unterstreichung endet spaetestens an der Zeile
+    r.check(!styleOf("<u>offen\nweiter", "weiter").underline, "rich: line styles end at the line");
+    // Unbekannte Tags bleiben Text
+    r.check(renderManuscript(p, "a <stark> b") == "a <stark> b", "rich: unknown tag stays text");
+
+    // Zeilen: Ueberschrift, Liste, Ausrichtung, Zeit, Trenner
+    const std::string doc =
+        "# Titel%%center%%\n## Kapitel\n- Punkt\n1. eins\n1. zwei\nText%%right%%\n#Tag 3\n---\nBlock%%justify%%";
+    const std::vector<ManuscriptLine> lines = manuscriptLines(doc);
+    r.check(lines.size() == 9, "lines: one per source line");
+    if (lines.size() == 9) {
+        r.check(lines[0].kind == LineKind::Heading && lines[0].level == 1 && lines[0].align == LineAlign::Center,
+                "lines: centred title");
+        r.check(doc.substr(lines[0].contentBegin, lines[0].contentEnd - lines[0].contentBegin) == "Titel",
+                "lines: heading content without hashes and marker");
+        r.check(lines[1].kind == LineKind::Heading && lines[1].level == 2, "lines: chapter heading");
+        r.check(lines[2].kind == LineKind::Bullet &&
+                    doc.substr(lines[2].contentBegin, lines[2].contentEnd - lines[2].contentBegin) == "Punkt",
+                "lines: bullet item");
+        r.check(lines[3].kind == LineKind::Numbered && lines[3].number == 1 && lines[4].number == 2,
+                "lines: numbering counts on");
+        r.check(lines[5].align == LineAlign::Right, "lines: right aligned body");
+        r.check(lines[6].kind == LineKind::Time, "lines: time marker line");
+        r.check(lines[7].kind == LineKind::Break, "lines: scene break line");
+        r.check(lines[8].align == LineAlign::Justify, "lines: justified line");
+        r.check(lineIndexAt(lines, lines[4].begin + 2) == 4, "lines: index lookup");
+    }
+    r.check(renderManuscript(p, "Mitte%%center%%") == "Mitte", "lines: alignment marker invisible");
+    size_t headings = 0;
+    for (const ManuscriptToken& t : parseManuscript(p, "## Kapitel%%center%%\nText")) {
+        if (t.kind == ManuscriptToken::Kind::Heading) {
+            ++headings;
+            r.check(t.raw == "## Kapitel", "lines: heading token ends before the marker");
+        }
+    }
+    r.check(headings == 1, "lines: centred heading still a heading");
+
+    // Serializer: Format zurueckschreiben und wieder lesen
+    TextStyle bold;
+    bold.bold = true;
+    TextStyle boldItalic = bold;
+    boldItalic.italic = true;
+    TextStyle italic;
+    italic.italic = true;
+    TextStyle fancy;
+    fancy.underline = true;
+    fancy.color = "#0070C0";
+    fancy.size = 16.0f;
+    std::vector<StyledUnit> units;
+    auto add = [&](const std::string& chars, const TextStyle& st) {
+        for (char ch : chars) units.push_back({std::string(1, ch), st});
+    };
+    add("ab", bold);
+    add("cd", boldItalic);
+    add(" e", italic);
+    add("f ", TextStyle());
+    add("gh", fancy);
+    add("@Alice", bold);
+    std::vector<size_t> positions;
+    const std::string written = serializeUnits(units, &positions);
+    bool roundTrip = positions.size() == units.size();
+    const std::vector<ManuscriptToken> reread = parseManuscript(p, written);
+    for (size_t i = 0; roundTrip && i < units.size(); ++i) {
+        const size_t pos = positions[i];
+        if (written.compare(pos, units[i].raw.size(), units[i].raw) != 0) roundTrip = false;
+        bool found = false;
+        for (const ManuscriptToken& t : reread) {
+            if (t.kind == ManuscriptToken::Kind::Markup) continue;
+            if (t.begin <= pos && pos < t.end) {
+                found = true;
+                // Elementmarke: das Format gilt fuer die ganze Marke
+                if (t.style != units[i].style) roundTrip = false;
+            }
+        }
+        if (!found) roundTrip = false;
+    }
+    r.check(roundTrip, "serializer: styles survive writing and reading back");
+    r.check(renderManuscript(p, written) == "abcd ef ghAlice", "serializer: visible text unchanged");
+
+    // Lesezeichen und Kommentare
+    const std::string marked = "Hier %%bm:Weiter%%geht es%%note:pruefen!%% weiter.";
+    size_t bookmarks = 0, notes = 0;
+    for (const ManuscriptToken& t : parseManuscript(p, marked)) {
+        if (t.kind == ManuscriptToken::Kind::Bookmark && t.field == "Weiter") ++bookmarks;
+        if (t.kind == ManuscriptToken::Kind::Note && t.field == "pruefen!") ++notes;
+    }
+    r.check(bookmarks == 1, "marks: bookmark recognised");
+    r.check(notes == 1, "marks: comment recognised");
+    r.check(renderManuscript(p, marked) == "Hier geht es weiter.", "marks: invisible in the finished text");
+    r.check(sanitizeMarkerText("a%%b\nc%") == "a%b c", "marks: comment text cannot end the marker");
+}
+
 // Word-Export: gueltiges ZIP, fertige Werte, keine Marken.
 void testWordExport(Report& r) {
     Project p;
@@ -500,7 +622,10 @@ void testWordExport(Report& r) {
             "docx: heading becomes a Word heading");
     r.check(docx.find("<w:t xml:space=\"preserve\">Kapitel 1</w:t>") != std::string::npos,
             "docx: heading text without the hashes");
-    r.check(docx.find("<w:br/>") != std::string::npos, "docx: soft line break inside a paragraph");
+    // Jede Zeile ist ein eigener Absatz - wie auf der Seite im Editor.
+    r.check(docx.find("<w:br/>") == std::string::npos &&
+                docx.find("<w:p><w:r><w:t xml:space=\"preserve\">Zweite Zeile.") != std::string::npos,
+            "docx: every line becomes its own paragraph");
     r.check(docx.find("<w:b/>") != std::string::npos, "docx: bold becomes a Word run property");
     r.check(docx.find("<w:i/>") != std::string::npos, "docx: italic becomes a Word run property");
     r.check(docx.find("<w:t xml:space=\"preserve\">sehr</w:t>") != std::string::npos,
@@ -510,6 +635,32 @@ void testWordExport(Report& r) {
     r.check(docx.find("<w:pStyle w:val=\"Title\"/>") != std::string::npos &&
                 docx.find("Meine Geschichte") != std::string::npos,
             "docx: project name as the title");
+
+    // Neue Formate landen als echte Word-Eigenschaften in der Datei.
+    p.manuscript =
+        "# Das Werk%%center%%\n"
+        "Ein <u>Wort</u> in <span style=\"color:#C00000\">Rot</span>.%%center%%\n"
+        "- Punkt\n"
+        "Mit %%note:geheim%% Notiz und %%bm:Marke%% Zeichen.";
+    const std::string rich = buildManuscriptDocx(p, std::string());
+    r.check(rich.find("<w:pStyle w:val=\"Title\"/><w:jc w:val=\"center\"/></w:pPr><w:r><w:t "
+                      "xml:space=\"preserve\">Das Werk") != std::string::npos,
+            "docx: title style becomes Word's title, centred");
+    const std::string titled = buildManuscriptDocx(p, "Projektname");
+    r.check(titled.find("Projektname</w:t>") == std::string::npos,
+            "docx: the manuscript's own title replaces the project name");
+    r.check(rich.find("<w:u w:val=\"single\"/>") != std::string::npos, "docx: underline");
+    r.check(rich.find("<w:color w:val=\"C00000\"/>") != std::string::npos, "docx: text colour");
+    r.check(rich.find("<w:jc w:val=\"center\"/>") != std::string::npos, "docx: centred paragraph");
+    r.check(rich.find("<w:ind w:left=") != std::string::npos, "docx: list item indented");
+    r.check(rich.find("geheim") == std::string::npos && rich.find("%%") == std::string::npos,
+            "docx: comments and markers left out");
+    DocxOptions options;
+    options.font = "Garamond";
+    options.sizePt = 13.0f;
+    const std::string styled = buildManuscriptDocx(p, p.name, options);
+    r.check(styled.find("w:ascii=\"Garamond\"") != std::string::npos && styled.find("<w:sz w:val=\"26\"/>") != std::string::npos,
+            "docx: base font and size from the editor");
 
     // Leeres Manuskript darf kein kaputtes Dokument ergeben.
     Project empty;
@@ -646,6 +797,7 @@ int runSelfTest(const std::string& reportPath) {
     testLegacyConnections(r);
     testManuscript(r);
     testManuscriptFormatting(r);
+    testManuscriptRichText(r);
     testWordExport(r);
     r.os << "---------------------\n"
          << r.passed << " ok, " << r.failed << " fehlgeschlagen\n";

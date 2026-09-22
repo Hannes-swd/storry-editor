@@ -40,7 +40,7 @@ Eine **Aktion** ist ein Ereignis in deiner Geschichte. Sie hat:
 Du schreibst sowieso schon eine Szene. Mach einfach ein Ereignis daraus:
 
 1. Cursor irgendwo in den Absatz setzen
-2. **Einfügen → Aktion aus diesem Absatz**
+2. **Einfügen → Aus Absatz** (oder Rechtsklick → **Aktion aus diesem Absatz**)
 
 Das Programm füllt alles selbst aus:
 
@@ -116,7 +116,7 @@ Die Leiste oben schränkt die Liste ein:
 ## 6.4 Eine Aktion von Hand anlegen
 
 **+ Neue Aktion** im Panel, <kbd>Strg</kbd>+<kbd>T</kbd>, Doppelklick auf eine freie
-Stelle in der Timeline, oder **Einfügen → Aktion verknüpfen → + Neue Aktion hier**.
+Stelle in der Timeline, oder **Einfügen → Aktion → + Neue Aktion hier**.
 
 ```
 ┌─ Neue Aktion ───────────────────────────────────────────┐
@@ -221,7 +221,7 @@ stehen ab dann überall zur Auswahl.
 
 Wenn eine Aktion schon existiert und du sie an einer Textstelle festmachen willst:
 
-**Einfügen → Aktion verknüpfen** → suchen → anklicken.
+**Einfügen → Aktion** → suchen → anklicken.
 
 Im Text steht dann `!act:…` – im Schreibmodus als farbige Marke sichtbar, im fertigen
 Text unsichtbar. Sie sagt nur: *„Hier in der Erzählung passiert dieses Ereignis."*
@@ -249,7 +249,7 @@ Es gibt keine „Aktualisieren"-Schaltfläche – alle Fenster zeigen immer dens
 ## ✅ Kurz gesagt
 
 - Eine **Aktion** = ein Ereignis zu einem Zeitpunkt, mit Beteiligten
-- Der schnellste Weg: **Einfügen → Aktion aus diesem Absatz**
+- Der schnellste Weg: **Einfügen → Aus Absatz** oder Rechtsklick → **Aktion aus diesem Absatz**
 - **Änderungen** an einer Aktion verschieben Werte ab diesem Zeitpunkt – überall
 - Typen, Stränge und Tags kannst du frei erweitern
 - Aktionen‑Panel und Timeline zeigen dieselben Daten, nur anders
