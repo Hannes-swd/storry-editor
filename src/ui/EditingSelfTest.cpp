@@ -117,6 +117,22 @@ void testTypingAndStyles(Checks& c) {
     f.view.select(0, f.text().size());
     docops::applyStyle(f.doc, f.view, [](TextStyle& s) { s = TextStyle(); });
     c.check(f.text() == "Hallo Weab", "edit: clear formatting removes all markup", f.text());
+
+    // Wie in Word: Cursor mitten im Wort, keine Auswahl -> ganzes Wort
+    Fixture w("Die Strasse war leer.");
+    w.view.setCaret(w.at("Strasse") + 3);
+    docops::applyStyle(w.doc, w.view, [](TextStyle& s) { s.underline = true; });
+    c.check(w.text() == "Die <u>Strasse</u> war leer.", "edit: caret inside a word formats the word",
+            w.text());
+    c.check(!w.view.hasSelection() && docops::selectionHas(w.doc, w.view,
+                                                            [](const TextStyle& s) { return s.underline; }),
+            "edit: caret stays, word reports its format");
+    docops::applyStyle(w.doc, w.view, [](TextStyle& s) { s.underline = false; });
+    c.check(w.text() == "Die Strasse war leer.", "edit: toggling again removes it", w.text());
+    w.view.setCaret(w.at("war"));
+    docops::applyStyle(w.doc, w.view, [](TextStyle& s) { s.bold = true; });
+    c.check(w.text() == "Die Strasse war leer.", "edit: caret at a word start only marks for typing",
+            w.text());
 }
 
 void testParagraphs(Checks& c) {
@@ -156,6 +172,12 @@ void testParagraphs(Checks& c) {
     k.view.setCaret(k.at("\n"));
     docops::deleteForward(k.doc, k.view, false);
     c.check(k.text() == "einszwei", "para: delete at the line end joins lines", k.text());
+
+    // Enter am Ende einer fetten Zeile: weiter fett, wie in Word
+    Fixture n("normal **fett**");
+    docops::newParagraph(n.doc, n.view);
+    docops::typeText(n.doc, n.view, "weiter");
+    c.check(n.text() == "normal **fett**\n**weiter**", "para: enter keeps the character format", n.text());
 
     // Enter mitten im fetten Wort: beide Haelften bleiben fett
     Fixture m("ein **fettes** Wort");

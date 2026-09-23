@@ -76,17 +76,22 @@ bool hasClosingMark(const std::string& text, size_t after, size_t markLength) {
     return false;
 }
 
-// Eine Zeile, die nur aus Strichen besteht, trennt zwei Szenen.
+// Eine Zeile aus mindestens drei gleichen Strichen trennt zwei Szenen:
+// "---", aber wie in Markdown/Obsidian auch "***", "* * *" oder "___".
 bool isSceneBreakLine(const std::string& text, size_t lineBegin, size_t lineEnd) {
-    size_t dashes = 0;
+    size_t marks = 0;
+    char mark = 0;
     for (size_t i = lineBegin; i < lineEnd; ++i) {
         const char c = text[i];
-        if (c == '-')
-            ++dashes;
-        else if (c != ' ' && c != '\t' && c != '\r')
+        if (c == '-' || c == '*' || c == '_') {
+            if (mark && c != mark) return false;
+            mark = c;
+            ++marks;
+        } else if (c != ' ' && c != '\t' && c != '\r') {
             return false;
+        }
     }
-    return dashes >= 3;
+    return marks >= 3;
 }
 
 bool isHeadingStart(const std::string& text, size_t i) {
@@ -237,6 +242,7 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
     bool underline = false;
     bool superscript = false;
     bool subscript = false;
+    bool marked = false;           // ==markiert== wie in Obsidian
     std::vector<TextStyle> spans;  // verschachtelte <span style=...>
 
     auto currentStyle = [&]() {
@@ -247,13 +253,14 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
         s.underline = underline;
         s.superscript = superscript;
         s.subscript = subscript;
+        if (marked && s.background.empty()) s.background = "#FFFF00";
         return s;
     };
     auto lineStylesActive = [&]() {
-        return strike || underline || superscript || subscript || !spans.empty();
+        return strike || underline || superscript || subscript || marked || !spans.empty();
     };
     auto resetAll = [&]() {
-        bold = italic = strike = underline = superscript = subscript = false;
+        bold = italic = strike = underline = superscript = subscript = marked = false;
         spans.clear();
     };
     auto stamp = [&](ManuscriptToken& t) {
@@ -312,7 +319,7 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
         }
 
         // ---------------------------------------------------- Szenenwechsel
-        if (c == '-' && atLineStart(text, i)) {
+        if ((c == '-' || c == '*' || c == '_') && atLineStart(text, i)) {
             const size_t lineEnd = lineEndOf(text, i);
             if (isSceneBreakLine(text, i, lineEnd)) {
                 flushText(i);
@@ -440,6 +447,23 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
             }
         }
 
+        // ------------------------------------------ ==Markierung== (Obsidian)
+        if (c == '=' && i + 1 < text.size() && text[i + 1] == '=') {
+            const size_t after = i + 2;
+            const size_t lineEnd = lineEndOf(text, i);
+            const size_t close = findBefore(text, "==", after, lineEnd);
+            const bool opening = !marked && after < lineEnd && close != std::string::npos && close > after &&
+                                 text[after] != ' ';
+            if (marked || opening) {
+                flushText(i);
+                markup(i, after);
+                marked = !marked;
+                i = after;
+                textStart = i;
+                continue;
+            }
+        }
+
         // ------------------------------------------------ HTML-Auszeichnung
         if (c == '<') {
             struct Tag {
@@ -531,7 +555,7 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
             // Unterstreichung, Farbe & Co. enden an der Zeile ...
             if (lineStylesActive()) {
                 flushText(i);
-                strike = underline = superscript = subscript = false;
+                strike = underline = superscript = subscript = marked = false;
                 spans.clear();
                 textStart = i;
             }
@@ -570,12 +594,13 @@ std::vector<ManuscriptLine> manuscriptLines(const std::string& text) {
             L.level = static_cast<int>(k - b);
             while (k < e && text[k] == ' ') ++k;
             L.contentBegin = k;
-        } else if (e > b && text[b] == '-' && isSceneBreakLine(text, b, e)) {
+        } else if (e > b && (text[b] == '-' || text[b] == '*' || text[b] == '_') && isSceneBreakLine(text, b, e)) {
             L.kind = LineKind::Break;
         } else if (e > b + 1 && text[b] == '#' && text[b + 1] != '#' && text[b + 1] != ' ') {
             long long parsed = 0;
             if (parseStoryTime(trim(text.substr(b + 1, e - b - 1)), &parsed)) L.kind = LineKind::Time;
-        } else if (e >= b + 2 && text[b] == '-' && text[b + 1] == ' ') {
+        } else if (e >= b + 2 && (text[b] == '-' || text[b] == '*' || text[b] == '+') && text[b + 1] == ' ') {
+            // "- ", aber wie in Markdown/Obsidian auch "* " und "+ "
             L.kind = LineKind::Bullet;
             L.contentBegin = b + 2;
         } else {

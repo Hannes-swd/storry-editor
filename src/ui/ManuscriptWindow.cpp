@@ -1031,7 +1031,7 @@ void ribbonInsert(Editor& ed, ManuscriptState& st, DocumentView& view, long long
         st.bookmarkDraft.clear();
         st.openBookmark = true;
     }
-    if (ribbon::labeled("##ins_note", icon::comment, TR("Kommentar"), TR("Eine Notiz an diese Stelle haengen - steht nie im fertigen Text"))) {
+    if (ribbon::labeled("##ins_note", icon::comment, TR("Kommentar"), TR("Eine Notiz an diese Stelle haengen - nicht im fertigen Text, in Word am Rand"))) {
         st.noteDraft.clear();
         st.noteBegin = st.noteEnd = kNone;
         st.openNote = true;
@@ -1402,7 +1402,8 @@ void ribbonFile(Editor& ed, ManuscriptState& st) {
     ImGui::SameLine();
     if (ribbon::big("##f_word", icon::word, TR("Als Word"),
                     TR("Schreibt die fertige Geschichte als .docx: Werte sind eingesetzt, Formatierung "
-                       "bleibt, Marken, Lesezeichen und Kommentare stehen nicht darin.")))
+                       "bleibt, Kommentare stehen am Rand, Lesezeichen werden Textmarken, "
+                       "Zeit- und Aktionsmarken fallen weg.")))
         ed.exportManuscriptToWord();
     ribbon::endGroup(TR("Datei"));
 
@@ -1743,7 +1744,7 @@ void drawDialogs(Editor& ed, ManuscriptState& st, DocumentView& view) {
             done(view);
             ImGui::CloseCurrentPopup();
         }
-        ui::textSecondary(TR("Kommentare stehen nie im fertigen Text."));
+        ui::textSecondary(TR("Nicht im fertigen Text - in der Word-Datei steht der Kommentar am Rand."));
         ImGui::EndPopup();
     }
 

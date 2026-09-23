@@ -669,7 +669,16 @@ void newParagraph(ManuscriptDoc& doc, DocumentView& view) {
     next.prefix = linePrefix(next.kind, 0);
     std::vector<LineModel> frag(2);
     frag[1] = next;
+    // Am Zeilenende geht das Zeichenformat wie in Word in die neue Zeile mit.
+    const TextStyle carried = view.pendingActive ? view.pending
+                              : idx > 0 && idx == m.units.size() && m.kind != LineKind::Heading
+                                  ? m.units[idx - 1].style
+                                  : TextStyle();
     replaceRange(doc, view, A, A, frag, false);
+    if (!carried.plain()) {
+        view.pending = carried;
+        view.pendingActive = true;
+    }
 }
 
 void deleteSelection(ManuscriptDoc& doc, DocumentView& view) {
@@ -768,9 +777,37 @@ TextStyle caretStyle(ManuscriptDoc& doc, DocumentView& view) {
     return styleForInsert(doc, view.cursor, false);
 }
 
+// Wort, in dessen Mitte der Cursor steht (ohne Auswahl, ohne vorgemerkte
+// Formatierung) - als Einheitenbereich [wa, wb) der Zeile li.
+bool caretWord(ManuscriptDoc& doc, DocumentView& view, size_t* li, size_t* wa, size_t* wb) {
+    if (view.hasSelection() || view.pendingActive) return false;
+    *li = lineIndexAt(doc.lines(), view.cursor);
+    const LineModel m = doc.model(*li);
+    if (m.atomic()) return false;
+    auto wordUnit = [&](size_t k) {
+        const unsigned char c = m.units[k].raw.empty() ? ' ' : m.units[k].raw[0];
+        return std::isalnum(c) || c >= 0x80 || c == '_';
+    };
+    const size_t idx = unitIndexAt(m, view.cursor);
+    if (idx == 0 || idx >= m.units.size() || !wordUnit(idx - 1) || !wordUnit(idx)) return false;
+    *wa = *wb = idx;
+    while (*wa > 0 && wordUnit(*wa - 1)) --*wa;
+    while (*wb < m.units.size() && wordUnit(*wb)) ++*wb;
+    return true;
+}
+
 void applyStyle(ManuscriptDoc& doc, DocumentView& view,
                 const std::function<void(TextStyle&)>& change) {
     if (!view.hasSelection()) {
+        // Wie in Word: Steht der Cursor mitten in einem Wort, gilt die
+        // Formatierung dem ganzen Wort.
+        size_t li = 0, wa = 0, wb = 0;
+        if (caretWord(doc, view, &li, &wa, &wb)) {
+            rewriteLines(doc, view, li, li, [&](LineModel& m, size_t, size_t) {
+                for (size_t k = wa; k < wb; ++k) change(m.units[k].style);
+            });
+            return;
+        }
         if (!view.pendingActive) {
             view.pending = caretStyle(doc, view);
             view.pendingActive = true;
@@ -800,6 +837,14 @@ void applyStyle(ManuscriptDoc& doc, DocumentView& view,
 
 bool selectionHas(ManuscriptDoc& doc, DocumentView& view,
                   const std::function<bool(const TextStyle&)>& test) {
+    size_t wl = 0, wa = 0, wb = 0;
+    if (caretWord(doc, view, &wl, &wa, &wb)) {
+        const LineModel m = doc.model(wl);
+        for (size_t k = wa; k < wb; ++k) {
+            if (!test(m.units[k].style)) return false;
+        }
+        return true;
+    }
     if (!view.hasSelection()) return test(caretStyle(doc, view));
     const std::vector<ManuscriptLine> lines = doc.lines();
     const size_t la = lineIndexAt(lines, view.selBegin());

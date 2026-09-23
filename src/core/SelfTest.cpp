@@ -583,6 +583,61 @@ void testManuscriptRichText(Report& r) {
     r.check(sanitizeMarkerText("a%%b\nc%") == "a%b c", "marks: comment text cannot end the marker");
 }
 
+// Zufallstest fuer den Serializer: beliebige Mischungen aus fett, kursiv,
+// durchgestrichen, unterstrichen und Leerzeichen muessen verlustfrei zurueck
+// gelesen werden - es darf nie ein Formatzeichen im sichtbaren Text landen.
+void testSerializerFuzz(Report& r) {
+    Project p;
+    unsigned int seed = 12345;
+    auto rnd = [&](unsigned int n) {
+        seed = seed * 1103515245u + 12345u;
+        return (seed >> 16) % n;
+    };
+    const char* chars[] = {"a", "b", " ", ",", ".", "\xC3\xA4", "-", "'"};
+    int failures = 0;
+    std::string firstFailure;
+    for (int iter = 0; iter < 4000 && failures < 5; ++iter) {
+        std::vector<StyledUnit> units;
+        const unsigned int len = 1 + rnd(12);
+        TextStyle style;
+        for (unsigned int k = 0; k < len; ++k) {
+            if (rnd(3) == 0) {
+                style.bold = rnd(2) == 0;
+                style.italic = rnd(2) == 0;
+                style.strike = rnd(5) == 0;
+                style.underline = rnd(5) == 0;
+            }
+            units.push_back({chars[rnd(8)], style});
+        }
+        std::string visible;
+        for (const StyledUnit& u : units) visible += u.raw;
+        const std::string written = serializeUnits(units);
+        const std::string rendered = renderManuscript(p, written);
+        bool ok = rendered == visible;
+        // Format jedes sichtbaren Nicht-Leerzeichens pruefen
+        if (ok) {
+            std::vector<size_t> positions;
+            serializeUnits(units, &positions);
+            const std::vector<ManuscriptToken> toks = parseManuscript(p, written);
+            for (size_t k = 0; k < units.size() && ok; ++k) {
+                if (units[k].raw == " ") continue;
+                for (const ManuscriptToken& t : toks) {
+                    if (t.kind != ManuscriptToken::Kind::Text || positions[k] < t.begin || positions[k] >= t.end) continue;
+                    if (t.style.bold != units[k].style.bold || t.style.italic != units[k].style.italic ||
+                        t.style.strike != units[k].style.strike || t.style.underline != units[k].style.underline)
+                        ok = false;
+                }
+            }
+        }
+        if (!ok) {
+            ++failures;
+            if (firstFailure.empty()) firstFailure = written + "  ->  " + rendered;
+        }
+    }
+    r.check(failures == 0, "serializer: random formatting always reads back" +
+                               (firstFailure.empty() ? std::string() : "  [" + firstFailure + "]"));
+}
+
 // Word-Export: gueltiges ZIP, fertige Werte, keine Marken.
 void testWordExport(Report& r) {
     Project p;
@@ -658,8 +713,24 @@ void testWordExport(Report& r) {
     r.check(rich.find("<w:color w:val=\"C00000\"/>") != std::string::npos, "docx: text colour");
     r.check(rich.find("<w:jc w:val=\"center\"/>") != std::string::npos, "docx: centred paragraph");
     r.check(rich.find("<w:ind w:left=") != std::string::npos, "docx: list item indented");
-    r.check(rich.find("geheim") == std::string::npos && rich.find("%%") == std::string::npos,
-            "docx: comments and markers left out");
+    r.check(rich.find("%%") == std::string::npos, "docx: no markers in the text");
+    r.check(rich.find("<w:commentReference w:id=\"0\"/>") != std::string::npos &&
+                rich.find("geheim</w:t></w:r></w:p></w:comment>") != std::string::npos,
+            "docx: comment becomes a Word comment");
+    r.check(rich.find("<w:bookmarkStart w:id=\"0\" w:name=\"Marke\"/>") != std::string::npos,
+            "docx: bookmark becomes a Word bookmark");
+
+    // Schreibweisen aus Obsidian/Markdown
+    p.manuscript = "* Punkt eins\n+ Punkt zwei\n***\nDas ist ==markiert== und <span style=\"background:#FFC080\">apricot</span>.";
+    const std::string md = buildManuscriptDocx(p, std::string());
+    r.check(md.find("* Punkt") == std::string::npos && md.find("+ Punkt") == std::string::npos &&
+                md.find("Punkt eins") != std::string::npos,
+            "docx: '* ' and '+ ' lists become bullets");
+    r.check(md.find("***") == std::string::npos && md.find("* * *") != std::string::npos,
+            "docx: '***' becomes a scene break");
+    r.check(md.find("<w:highlight w:val=\"yellow\"/>") != std::string::npos && md.find("==") == std::string::npos,
+            "docx: ==marked== becomes Word's yellow highlight");
+    r.check(md.find("w:fill=\"FFC080\"") != std::string::npos, "docx: other highlight colours as shading");
     DocxOptions options;
     options.font = "Garamond";
     options.sizePt = 13.0f;
@@ -803,6 +874,7 @@ int runSelfTest(const std::string& reportPath) {
     testManuscript(r);
     testManuscriptFormatting(r);
     testManuscriptRichText(r);
+    testSerializerFuzz(r);
     testWordExport(r);
     r.os << "---------------------\n"
          << r.passed << " ok, " << r.failed << " fehlgeschlagen\n";

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cctype>
 #include <cstdint>
 #include <ctime>
 #include <vector>
@@ -159,11 +160,42 @@ std::string isoNow() {
     return buf;
 }
 
-// Ein Textstueck mit gleichbleibendem Zeichenformat.
+// Ein Textstueck mit gleichbleibendem Zeichenformat - oder eine Stelle, an
+// der ein Kommentar bzw. eine Textmarke haengt.
 struct Run {
     std::string text;
     TextStyle style;
+    enum class Mark { None, Comment, Bookmark };
+    Mark mark = Mark::None;
+    int id = 0;
+    std::string name;  // Textmarke
 };
+
+// Kommentare und Textmarken des ganzen Dokuments
+struct Annotations {
+    std::vector<std::string> comments;  // Index = Kommentar-ID
+    int bookmarks = 0;
+    std::vector<std::string> usedNames;
+};
+
+// Word erlaubt in Textmarkennamen nur Buchstaben, Ziffern und _, am Anfang
+// einen Buchstaben, hoechstens 40 Zeichen - und jeder Name nur einmal.
+std::string bookmarkName(const std::string& raw, Annotations& notes) {
+    std::string name;
+    for (unsigned char c : raw) {
+        if (std::isalnum(c) || c == '_')
+            name += static_cast<char>(c);
+        else if (c == ' ' || c == '-')
+            name += '_';
+    }
+    if (name.empty() || !std::isalpha(static_cast<unsigned char>(name[0]))) name = "Marke_" + name;
+    if (name.size() > 36) name.resize(36);
+    std::string unique = name;
+    for (int n = 2; std::find(notes.usedNames.begin(), notes.usedNames.end(), unique) != notes.usedNames.end(); ++n)
+        unique = name + "_" + std::to_string(n);
+    notes.usedNames.push_back(unique);
+    return unique;
+}
 
 // Ein Absatz: jede Zeile des Manuskripts wird einer - so sieht die Word-Datei
 // genauso aus wie die Seite im Editor.
@@ -180,14 +212,14 @@ struct Para {
 
 void addRun(std::vector<Run>& runs, const std::string& text, const TextStyle& style) {
     if (text.empty()) return;
-    if (!runs.empty() && runs.back().style == style) {
+    if (!runs.empty() && runs.back().mark == Run::Mark::None && runs.back().style == style) {
         runs.back().text += text;
         return;
     }
     runs.push_back({text, style});
 }
 
-std::vector<Para> buildParagraphs(const Project& p, const std::string& text) {
+std::vector<Para> buildParagraphs(const Project& p, const std::string& text, Annotations& notes) {
     const std::vector<ManuscriptToken> tokens = parseManuscript(p, text);
     std::vector<Para> paras;
     size_t tokenIndex = 0;
@@ -246,8 +278,25 @@ std::vector<Para> buildParagraphs(const Project& p, const std::string& text) {
                     addRun(para.runs, value, t.style);
                     break;
                 }
+                case ManuscriptToken::Kind::Note: {
+                    // Kommentar: in Word am Rand, an genau dieser Stelle
+                    Run mark;
+                    mark.mark = Run::Mark::Comment;
+                    mark.id = static_cast<int>(notes.comments.size());
+                    notes.comments.push_back(t.field);
+                    para.runs.push_back(mark);
+                    break;
+                }
+                case ManuscriptToken::Kind::Bookmark: {
+                    Run mark;
+                    mark.mark = Run::Mark::Bookmark;
+                    mark.id = notes.bookmarks++;
+                    mark.name = bookmarkName(t.field, notes);
+                    para.runs.push_back(mark);
+                    break;
+                }
                 default:
-                    break;  // Formatzeichen, Aktionen, Lesezeichen, Kommentare
+                    break;  // Formatzeichen und Aktionen
             }
         }
         paras.push_back(para);
@@ -261,7 +310,38 @@ int twips(float cm) { return static_cast<int>(std::lround(cm * 566.93f)); }
 // "#C00000" -> "C00000"
 std::string hexOf(const std::string& color) { return color.size() == 7 ? color.substr(1) : color; }
 
+// Hervorhebung: Words eigene Textmarkerfarben, wenn die Farbe eine davon ist -
+// sonst eine Schattierung in genau dieser Farbe.
+const char* wordHighlight(const std::string& color) {
+    struct Named {
+        const char* hex;
+        const char* name;
+    };
+    static const Named colors[] = {
+        {"FFFF00", "yellow"},  {"00FF00", "green"},      {"00FFFF", "cyan"},        {"FF00FF", "magenta"},
+        {"0000FF", "blue"},    {"FF0000", "red"},        {"000080", "darkBlue"},    {"008080", "darkCyan"},
+        {"008000", "darkGreen"}, {"800080", "darkMagenta"}, {"800000", "darkRed"}, {"808000", "darkYellow"},
+        {"808080", "darkGray"}, {"C0C0C0", "lightGray"}, {"000000", "black"},
+    };
+    std::string hex = color.size() == 7 ? color.substr(1) : color;
+    for (char& ch : hex) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+    for (const Named& n : colors) {
+        if (hex == n.hex) return n.name;
+    }
+    return nullptr;
+}
+
 std::string runXml(const Run& run, const DocxOptions& options) {
+    if (run.mark == Run::Mark::Comment) {
+        const std::string id = std::to_string(run.id);
+        return "<w:commentRangeStart w:id=\"" + id + "\"/><w:commentRangeEnd w:id=\"" + id +
+               "\"/><w:r><w:commentReference w:id=\"" + id + "\"/></w:r>";
+    }
+    if (run.mark == Run::Mark::Bookmark) {
+        const std::string id = std::to_string(run.id);
+        return "<w:bookmarkStart w:id=\"" + id + "\" w:name=\"" + xmlEscape(run.name) +
+               "\"/><w:bookmarkEnd w:id=\"" + id + "\"/>";
+    }
     const TextStyle& s = run.style;
     std::string props;
     if (!s.font.empty() && s.font != options.font)
@@ -273,9 +353,12 @@ std::string runXml(const Run& run, const DocxOptions& options) {
     if (!s.color.empty()) props += "<w:color w:val=\"" + hexOf(s.color) + "\"/>";
     if (s.size > 0.0f)
         props += "<w:sz w:val=\"" + std::to_string(static_cast<int>(s.size * 2.0f + 0.5f)) + "\"/>";
-    if (!s.background.empty())
-        props += "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"" + hexOf(s.background) + "\"/>";
+    // Reihenfolge wie im OOXML-Schema: ... sz, highlight, u, ..., shd, ..., vertAlign
+    const char* highlight = s.background.empty() ? nullptr : wordHighlight(s.background);
+    if (highlight) props += std::string("<w:highlight w:val=\"") + highlight + "\"/>";
     if (s.underline) props += "<w:u w:val=\"single\"/>";
+    if (!s.background.empty() && !highlight)
+        props += "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"" + hexOf(s.background) + "\"/>";
     if (s.superscript) props += "<w:vertAlign w:val=\"superscript\"/>";
     else if (s.subscript) props += "<w:vertAlign w:val=\"subscript\"/>";
 
@@ -353,6 +436,8 @@ const char* kContentTypes =
     "officedocument.wordprocessingml.styles+xml\"/>"
     "<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-"
     "package.core-properties+xml\"/>"
+    "<Override PartName=\"/word/comments.xml\" ContentType=\"application/vnd.openxmlformats-"
+    "officedocument.wordprocessingml.comments+xml\"/>"
     "</Types>";
 
 const char* kRootRels =
@@ -369,6 +454,8 @@ const char* kDocumentRels =
     "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
     "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/"
     "relationships/styles\" Target=\"styles.xml\"/>"
+    "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/"
+    "relationships/comments\" Target=\"comments.xml\"/>"
     "</Relationships>";
 
 // Formatvorlagen: Grundschrift, Zeilenabstand und Ueberschriften kommen aus
@@ -411,7 +498,8 @@ std::string buildManuscriptDocx(const Project& p, const std::string& title,
     // wird zu echten Word-Eigenschaften.
     std::string body;
     // Hat das Manuskript selbst einen Titel ("# ..."), ersetzt der den Projektnamen.
-    const std::vector<Para> paras = buildParagraphs(p, p.manuscript);
+    Annotations notes;
+    const std::vector<Para> paras = buildParagraphs(p, p.manuscript, notes);
     bool ownTitle = false;
     for (const Para& para : paras) {
         if (para.kind == Para::Kind::Heading && para.headingLevel == 0) ownTitle = true;
@@ -464,6 +552,17 @@ std::string buildManuscriptDocx(const Project& p, const std::string& title,
     zip.add("word/_rels/document.xml.rels", kDocumentRels);
     zip.add("word/document.xml", document);
     zip.add("word/styles.xml", stylesXml(options));
+
+    // Kommentare aus dem Manuskript erscheinen in Word am Rand.
+    std::string comments =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+        "<w:comments xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">";
+    for (size_t i = 0; i < notes.comments.size(); ++i)
+        comments += "<w:comment w:id=\"" + std::to_string(i) + "\" w:author=\"Story Editor\" w:initials=\"SE\" w:date=\"" +
+                    stamp + "\"><w:p><w:r><w:t xml:space=\"preserve\">" + xmlEscape(notes.comments[i]) +
+                    "</w:t></w:r></w:p></w:comment>";
+    comments += "</w:comments>";
+    zip.add("word/comments.xml", comments);
     return zip.finish();
 }
 

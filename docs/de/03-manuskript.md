@@ -201,7 +201,8 @@ es entsteht also nie eine Lücke im Text.
 
 ## 3.6 Lesezeichen und Kommentare
 
-Zwei Werkzeuge nur für dich – im fertigen Text und in der Word‑Datei stehen sie nie.
+Zwei Werkzeuge nur für dich – im fertigen Text stehen sie nie. In der Word‑Datei landen
+Kommentare als echte Word‑Kommentare am Rand und Lesezeichen als Textmarken.
 
 | | So geht's | Im Text |
 |:--|:--|:--|
@@ -392,7 +393,8 @@ gewählt, dass auch Obsidian sie darstellt:
 | `**fett**` `*kursiv*` `~~durch~~` | Hervorhebung |
 | `<u>…</u>` `<sup>…</sup>` `<sub>…</sub>` | Unterstrichen, hoch‑, tiefgestellt |
 | `<span style="color:#C00000;background:#FFFF00;font-size:14pt;font-family:Georgia">…</span>` | Farbe, Hervorhebung, Größe, Schriftart |
-| `- Punkt` · `1. Punkt` | Aufzählung, Nummerierung |
+| `- Punkt` · `1. Punkt` | Aufzählung, Nummerierung (wie in Obsidian auch `* Punkt`, `+ Punkt`) |
+| `==markiert==` | Gelbe Hervorhebung wie in Obsidian |
 | `…%%center%%` am Zeilenende | Ausrichtung (`center`, `right`, `justify`) |
 | `…%%pf:left=1.5;first=1.25;tabs=5,8%%` am Zeilenende | Absatzformat aus dem Lineal: Einzüge und Tabstopps in cm |
 | `%%bm:Name%%` | Lesezeichen |

@@ -104,7 +104,11 @@ What comes out:
 | `---` | Centred separator `* * *` |
 | `#Day 5, 14:00` | **gone** |
 | `!act:…` | **gone** |
-| Bookmarks, comments | **gone** |
+| Comments | Word comments in the margin |
+| Bookmarks | Word bookmarks |
+| `==marked==`, highlight in Word colours | Real Word highlight (other colours as shading) |
+| `* item`, `+ item` (like in Obsidian) | Bullet list |
+| `***`, `* * *`, `___` | Centred separator `* * *` |
 | Every line | One paragraph – just like on the page in the editor |
 | Indents and tab stops from the ruler | Real Word indents and tab stops |
 | Base font, line spacing, margins, paper size | From **Layout** and the ruler |

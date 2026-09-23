@@ -201,7 +201,8 @@ or does not exist, the program uses the name instead – so there is never a gap
 
 ## 3.6 Bookmarks and comments
 
-Two tools just for you – they never appear in the finished text or the Word file.
+Two tools just for you – they never appear in the finished text. In the Word file,
+comments become real Word comments in the margin and bookmarks become Word bookmarks.
 
 | | How | In the text |
 |:--|:--|:--|
@@ -391,7 +392,8 @@ Obsidian displays them too:
 | `**bold**` `*italic*` `~~struck~~` | Emphasis |
 | `<u>…</u>` `<sup>…</sup>` `<sub>…</sub>` | Underline, superscript, subscript |
 | `<span style="color:#C00000;background:#FFFF00;font-size:14pt;font-family:Georgia">…</span>` | Colour, highlight, size, font |
-| `- item` · `1. item` | Bullets, numbering |
+| `- item` · `1. item` | Bullets, numbering (like in Obsidian also `* item`, `+ item`) |
+| `==marked==` | Yellow highlight like in Obsidian |
 | `…%%center%%` at the end of a line | Alignment (`center`, `right`, `justify`) |
 | `…%%pf:left=1.5;first=1.25;tabs=5,8%%` at the end of a line | Paragraph format from the ruler: indents and tab stops in cm |
 | `%%bm:Name%%` | Bookmark |

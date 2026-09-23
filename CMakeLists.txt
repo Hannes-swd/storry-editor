@@ -76,6 +76,7 @@ add_executable(StoryEditor WIN32
     src/app/Platform.cpp
     src/app/TextureCache.cpp
     src/app/SpellCheck.cpp
+    src/app/UiTestDriver.cpp
     src/core/StoryTime.cpp
     src/core/Manuscript.cpp
     src/core/DocxExport.cpp

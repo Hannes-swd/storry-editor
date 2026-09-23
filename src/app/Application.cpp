@@ -13,6 +13,7 @@
 
 #include "app/Platform.h"
 #include "app/TextureCache.h"
+#include "app/UiTestDriver.h"
 #include "ui/Lang.h"
 #include "ui/Theme.h"
 
@@ -265,7 +266,15 @@ int Application::run() {
         return 1;
     }
 
-    ::ShowWindow(hwnd, SW_SHOWDEFAULT);
+    // Oberflaechentest: Fenster ausserhalb des Bildschirms, ohne den Fokus zu
+    // nehmen - echte Maus und Tastatur erreichen es nicht.
+    const bool testRun = uitest::active();
+    if (testRun) {
+        ::SetWindowPos(hwnd, nullptr, -5000, -5000, 1600, 950, SWP_NOZORDER | SWP_NOACTIVATE);
+        ::ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+    } else {
+        ::ShowWindow(hwnd, SW_SHOWDEFAULT);
+    }
     ::UpdateWindow(hwnd);
     ::DragAcceptFiles(hwnd, TRUE);
 
@@ -274,7 +283,7 @@ int Application::run() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    if (!testRun) io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;  // im Test alles in einem Bild
     io.ConfigWindowsMoveFromTitleBarOnly = true;
 
     // v2: die Fenster haben feste ###-IDs bekommen, alte Layouts passen nicht mehr.
@@ -305,7 +314,7 @@ int Application::run() {
         }
         if (!running) break;
 
-        if (g_swapChainOccluded && g_swapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED) {
+        if (!testRun && g_swapChainOccluded && g_swapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED) {
             ::Sleep(10);
             continue;
         }
@@ -322,6 +331,10 @@ int Application::run() {
         theme::loadPendingFonts();
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
+        if (testRun) {
+            uitest::beforeNewFrame(editor_);
+            if (uitest::finished()) running = false;
+        }
         ImGui::NewFrame();
 
         editor_.newFrame(io.DeltaTime);
@@ -344,7 +357,8 @@ int Application::run() {
             ImGui::RenderPlatformWindowsDefault();
         }
 
-        HRESULT hr = g_swapChain->Present(1, 0);
+        if (testRun) uitest::afterRender(g_device, g_context, g_swapChain);
+        HRESULT hr = g_swapChain->Present(testRun ? 0 : 1, 0);
         g_swapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
     }
 

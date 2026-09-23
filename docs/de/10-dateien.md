@@ -104,7 +104,11 @@ Was dabei entsteht:
 | `---` | zentrierte Trennung `* * *` |
 | `#Tag 5, 14:00` | **weg** |
 | `!act:…` | **weg** |
-| Lesezeichen, Kommentare | **weg** |
+| Kommentare | Word‑Kommentare am Rand |
+| Lesezeichen | Word‑Textmarken |
+| `==markiert==`, Hervorhebung in Word‑Farben | echter Word‑Textmarker (andere Farben als Schattierung) |
+| `* Punkt`, `+ Punkt` (wie in Obsidian) | Aufzählung |
+| `***`, `* * *`, `___` | zentrierte Trennung `* * *` |
 | jede Zeile | ein Absatz – wie auf der Seite im Editor |
 | Einzüge und Tabstopps aus dem Lineal | echte Word‑Einzüge und ‑Tabstopps |
 | Grundschrift, Zeilenabstand, Ränder, Papierformat | aus **Layout** und dem Lineal |
