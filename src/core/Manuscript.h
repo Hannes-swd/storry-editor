@@ -17,6 +17,8 @@
 //                       -> Farbe, Hintergrund, Groesse, Schriftart
 //   - Punkt / 1. Punkt  -> Aufzaehlung bzw. nummerierte Liste
 //   ...%%center%%       -> Ausrichtung der Zeile (center, right, justify)
+//   ...%%pf:align=center;left=1.5;right=0.5;first=-0.63;tabs=2.5,5%%
+//                       -> Absatzformat: Ausrichtung, Einzuege und Tabstopps in cm
 //   %%bm:Name%%         -> Lesezeichen
 //   %%note:Text%%       -> Kommentar an dieser Stelle
 //   ---                 -> Szenenwechsel (im Export eine zentrierte Trennung)
@@ -91,6 +93,23 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
 enum class LineKind { Body, Heading, Break, Time, Bullet, Numbered };
 enum class LineAlign { Left, Center, Right, Justify };
 
+// Absatzformat wie im Lineal von Word. Alle Werte in Zentimetern: Einzuege
+// vom linken bzw. rechten Seitenrand, `first` ist der Erstzeileneinzug
+// relativ zum linken Einzug (negativ = haengend). Tabstopps zaehlen vom
+// linken Seitenrand.
+struct ParagraphFormat {
+    LineAlign align = LineAlign::Left;
+    float left = 0.0f;
+    float right = 0.0f;
+    float first = 0.0f;
+    std::vector<float> tabs;
+
+    bool operator==(const ParagraphFormat& o) const {
+        return align == o.align && left == o.left && right == o.right && first == o.first && tabs == o.tabs;
+    }
+    bool operator!=(const ParagraphFormat& o) const { return !(*this == o); }
+};
+
 struct ManuscriptLine {
     size_t begin = 0;         // erstes Byte der Zeile
     size_t end = 0;           // Position des '\n' (bzw. Textende)
@@ -100,6 +119,7 @@ struct ManuscriptLine {
     int level = 0;            // Ueberschrift: Anzahl der '#'
     int number = 0;           // nummerierte Liste: laufende Nummer (ab 1)
     LineAlign align = LineAlign::Left;
+    ParagraphFormat format;   // align ist auch hier enthalten
 };
 
 std::vector<ManuscriptLine> manuscriptLines(const std::string& text);
@@ -111,6 +131,9 @@ size_t lineIndexAt(const std::vector<ManuscriptLine>& lines, size_t offset);
 // Ausrichtung ("%%center%%", leer fuer links).
 std::string linePrefix(LineKind kind, int level);
 std::string alignMarker(LineAlign align);
+// Marke fuer ein ganzes Absatzformat - nur Ausrichtung ergibt die kurze Form
+// "%%center%%", ohne alles einen leeren Text.
+std::string paragraphMarker(const ParagraphFormat& format);
 
 // ---------------------------------------------------------- Serializer
 // Ein sichtbares Zeichen (oder eine ganze Marke wie "@Alice") mit Format.

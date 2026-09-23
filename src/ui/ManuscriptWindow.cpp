@@ -19,6 +19,7 @@
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
 
+#include "app/SpellCheck.h"
 #include "core/Manuscript.h"
 #include "core/StoryTime.h"
 #include "ui/Dialogs.h"
@@ -75,6 +76,11 @@ struct ManuscriptState {
     std::string bookmarkDraft;
     bool openWordCount = false;
     bool openContext = false;
+    // Rechtsklick auf ein rot markiertes Wort
+    size_t spellBegin = 0, spellEnd = 0;
+    std::string spellWord;
+    std::vector<std::string> spellSuggestions;
+    uint64_t namesSignature = 0;  // Elementnamen fuer die Rechtschreibung
 
     // ---------------------------------------------- Autovervollstaendigung
     std::string completionWord;
@@ -127,6 +133,88 @@ std::string formatPt(float v) {
     return buf;
 }
 
+// ------------------------------------------------------------ Sprache
+// Einstellung "de"/"en" oder eine genaue Variante wie "en-GB". Windows bietet
+// nicht jede Variante an - dann wird die naechstbeste installierte genommen.
+const std::vector<std::string>& installedLanguages() {
+    static std::vector<std::string> list = spell::installedLanguages();
+    return list;
+}
+
+bool languageInstalled(const std::string& tag) {
+    const std::vector<std::string>& installed = installedLanguages();
+    return std::find(installed.begin(), installed.end(), tag) != installed.end();
+}
+
+std::string resolveLanguage(const std::string& setting) {
+    const std::vector<std::string>& installed = installedLanguages();
+    auto has = [&](const std::string& tag) {
+        return std::find(installed.begin(), installed.end(), tag) != installed.end();
+    };
+    if (setting.size() > 2 && has(setting)) return setting;
+    const std::string base = setting.substr(0, 2);
+    const char* preferred[] = {"de-DE", "de-AT", "de-CH", "en-US", "en-GB"};
+    for (const char* p : preferred) {
+        if (std::string(p).compare(0, 2, base) == 0 && has(p)) return p;
+    }
+    for (const std::string& tag : installed) {
+        if (tag.compare(0, 2, base) == 0) return tag;
+    }
+    return base == "en" ? "en-US" : "de-DE";
+}
+
+std::string languageName(const std::string& tag) {
+    struct Name {
+        const char* tag;
+        const char* name;
+    };
+    static const Name names[] = {
+        {"de-DE", "Deutsch (Deutschland)"}, {"de-AT", "Deutsch (Oesterreich)"}, {"de-CH", "Deutsch (Schweiz)"},
+        {"de-LI", "Deutsch (Liechtenstein)"}, {"de-LU", "Deutsch (Luxemburg)"}, {"en-US", "Englisch (USA)"},
+        {"en-GB", "Englisch (Grossbritannien)"}, {"en-AU", "Englisch (Australien)"}, {"en-CA", "Englisch (Kanada)"},
+        {"en-IE", "Englisch (Irland)"}, {"en-IN", "Englisch (Indien)"}, {"en-NZ", "Englisch (Neuseeland)"},
+        {"en-ZA", "Englisch (Suedafrika)"},
+    };
+    for (const Name& n : names) {
+        if (tag == n.tag) return TR(n.name);
+    }
+    return tag;
+}
+
+// Auswahl der Textsprache - im Menueband und in der Statusleiste.
+bool languageMenu() {
+    AppSettings& s = theme::settings();
+    bool changed = false;
+    const std::string current = resolveLanguage(s.docLanguage);
+    if (ImGui::MenuItem(TR("Deutsch"), nullptr, current.compare(0, 2, "de") == 0)) {
+        s.docLanguage = "de";
+        changed = true;
+    }
+    if (ImGui::MenuItem(TR("Englisch"), nullptr, current.compare(0, 2, "en") == 0)) {
+        s.docLanguage = "en";
+        changed = true;
+    }
+    if (ImGui::BeginMenu(TR("Varianten"))) {
+        for (const std::string& tag : installedLanguages()) {
+            if (tag.compare(0, 2, "de") != 0 && tag.compare(0, 2, "en") != 0) continue;
+            if (ImGui::MenuItem(languageName(tag).c_str(), tag.c_str(), tag == current)) {
+                s.docLanguage = tag;
+                changed = true;
+            }
+        }
+        ImGui::EndMenu();
+    }
+    if (!languageInstalled(current)) {
+        ImGui::Separator();
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 320.0f);
+        ui::textSecondary(TR("Diese Sprache ist in Windows nicht installiert. Hinzufuegen unter "
+                             "Einstellungen > Zeit und Sprache > Sprache und Region."));
+        ImGui::PopTextWrapPos();
+    }
+    if (changed) theme::save();
+    return changed;
+}
+
 DocOptions makeOptions(const ManuscriptState& st) {
     const AppSettings& s = theme::settings();
     DocOptions o;
@@ -136,9 +224,14 @@ DocOptions makeOptions(const ManuscriptState& st) {
     o.zoom = s.docZoom;
     theme::pageSizeCm(s.docPageFormat, &o.pageWidthCm, &o.pageHeightCm);
     o.marginCm = s.docMarginCm;
+    o.marginLeftCm = s.docMarginLeftCm;
+    o.marginRightCm = s.docMarginRightCm;
     o.font = s.docFont;
     o.fontPt = s.docFontSize;
     o.lineSpacing = s.docLineSpacing;
+    o.spellCheck = s.docSpellCheck;
+    o.autoCorrect = s.docAutoCorrect;
+    o.language = resolveLanguage(s.docLanguage);
     return o;
 }
 
@@ -487,6 +580,14 @@ void drawHelpWindow(ManuscriptState& st) {
              "Ueberpruefen: Kommentar an die Stelle haengen, Lesezeichen setzen und anspringen."},
             {"Seite und Ansicht", "Layout: Raender, Format, Zeilenabstand. Ansicht: Lesemodus, "
                                   "Lineal, Zoom (Strg+Mausrad), geteilte Ansicht, Fokus."},
+            {"Rechtschreibung und AutoKorrektur",
+             "Ueberpruefen > Rechtschreibung: rote Wellen unter unbekannten Woertern, Rechtsklick "
+             "zeigt Vorschlaege, F7 springt zum naechsten. AutoKorrektur und Sprache daneben oder "
+             "unten in der Statusleiste."},
+            {"Lineal: Einzuege und Tabstopps",
+             "Dreiecke im Lineal ziehen: Einzug der ersten Zeile, haengender und rechter Einzug. "
+             "Klick ins Lineal setzt einen Tabstopp, herausziehen entfernt ihn. Die Grenze grau/weiss "
+             "verschiebt den Seitenrand."},
             {"Etwas wiederfinden", "Suchen (Strg+F), Ersetzen (Strg+H) - findet auch Namen und Marken."},
         };
         for (const Row& row : rows) {
@@ -956,14 +1057,25 @@ void ribbonLayout(ManuscriptState& st, DocumentView& view) {
         const M ms[] = {{"Schmal (1,27 cm)", 1.27f}, {"Mittel (1,9 cm)", 1.9f}, {"Normal (2,5 cm)", 2.5f},
                         {"Breit (3,5 cm)", 3.5f}};
         for (const M& m : ms) {
-            if (ImGui::Selectable(TR(m.name), std::fabs(s.docMarginCm - m.cm) < 0.01f)) {
-                s.docMarginCm = m.cm;
+            const bool same = std::fabs(s.docMarginCm - m.cm) < 0.01f && std::fabs(s.docMarginLeftCm - m.cm) < 0.01f &&
+                              std::fabs(s.docMarginRightCm - m.cm) < 0.01f;
+            if (ImGui::Selectable(TR(m.name), same)) {
+                s.docMarginCm = s.docMarginLeftCm = s.docMarginRightCm = m.cm;
                 changed = true;
             }
         }
         ImGui::Separator();
         ImGui::SetNextItemWidth(140.0f);
+        ImGui::TextUnformatted(TR("Oben / unten"));
+        ImGui::SetNextItemWidth(140.0f);
         if (ImGui::SliderFloat("##margin", &s.docMarginCm, 0.5f, 6.0f, "%.2f cm")) changed = true;
+        ImGui::TextUnformatted(TR("Links"));
+        ImGui::SetNextItemWidth(140.0f);
+        if (ImGui::SliderFloat("##marginl", &s.docMarginLeftCm, 0.0f, 6.0f, "%.2f cm")) changed = true;
+        ImGui::TextUnformatted(TR("Rechts"));
+        ImGui::SetNextItemWidth(140.0f);
+        if (ImGui::SliderFloat("##marginr", &s.docMarginRightCm, 0.0f, 6.0f, "%.2f cm")) changed = true;
+        ui::textSecondary(TR("Links und rechts auch direkt im Lineal ziehen."));
         ImGui::EndPopup();
     }
     ImGui::SameLine();
@@ -1143,6 +1255,44 @@ void ribbonReview(ManuscriptState& st, DocumentView& view) {
     if (ribbon::big("##rev_count", icon::count, TR("Woerter zaehlen"), TR("Seiten, Woerter, Zeichen und Absaetze")))
         st.openWordCount = true;
     ribbon::endGroup(TR("Dokumentpruefung"));
+
+    ribbon::beginGroup();
+    {
+        AppSettings& s = theme::settings();
+        if (ribbon::big("##rev_spell", icon::spelling, TR("Rechtschreibung"),
+                        TR("Unbekannte Woerter rot unterwellen - Rechtsklick zeigt Vorschlaege"), s.docSpellCheck)) {
+            s.docSpellCheck = !s.docSpellCheck;
+            theme::save();
+        }
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        if (ribbon::labeled("##rev_auto", icon::autoCorrect, TR("AutoKorrektur"),
+                            TR("Beim Tippen: Satzanfang gross, typografische Anfuehrungszeichen, ... und "
+                               "Gedankenstriche, bekannte Tippfehler. Strg+Z direkt danach nimmt es zurueck."),
+                            s.docAutoCorrect)) {
+            s.docAutoCorrect = !s.docAutoCorrect;
+            theme::save();
+        }
+        const std::string lang = languageName(resolveLanguage(s.docLanguage));
+        if (ribbon::labeled("##rev_lang", icon::webView, lang.c_str(), TR("Sprache des Textes"))) ImGui::OpenPopup("ms_lang");
+        if (ImGui::BeginPopup("ms_lang")) {
+            languageMenu();
+            ImGui::EndPopup();
+        }
+        ImGui::EndGroup();
+        ImGui::SameLine();
+        if (ribbon::labeled("##rev_next_err", icon::next, TR("Naechster Fehler"), TR("Zum naechsten unbekannten Wort (F7)"),
+                            false, s.docSpellCheck && spell::available())) {
+            size_t b = 0, e = 0;
+            if (docops::findSpellingError(st.doc, view.selEnd(), &b, &e)) {
+                view.select(b, e);
+                done(view);
+            } else {
+                st.doc.editor().setStatus(TR("Keine Rechtschreibfehler gefunden."));
+            }
+        }
+    }
+    ribbon::endGroup(TR("Rechtschreibung"));
 }
 
 void ribbonView(ManuscriptState& st, DocumentView& view, const DocOptions& opt) {
@@ -1454,6 +1604,31 @@ void drawStatusBar(Editor& ed, ManuscriptState& st, DocumentView& view, const Do
     }
 
     ImGui::SameLine(0.0f, 18.0f);
+    {
+        const std::string tag = resolveLanguage(s.docLanguage);
+        const bool ok = languageInstalled(tag);
+        const std::string label = languageName(tag) + "###mslang";
+        if (!ok) ImGui::PushStyleColor(ImGuiCol_Text, c.warningColor);
+        if (ImGui::SmallButton(label.c_str())) ImGui::OpenPopup("ms_lang_status");
+        if (!ok) ImGui::PopStyleColor();
+        ui::tooltip(ok ? TR("Sprache des Textes - fuer Rechtschreibung und AutoKorrektur")
+                       : TR("Diese Sprache ist in Windows nicht installiert."));
+        if (ImGui::BeginPopup("ms_lang_status")) {
+            languageMenu();
+            ImGui::Separator();
+            if (ImGui::MenuItem(TR("Rechtschreibung pruefen"), nullptr, s.docSpellCheck)) {
+                s.docSpellCheck = !s.docSpellCheck;
+                theme::save();
+            }
+            if (ImGui::MenuItem(TR("AutoKorrektur"), nullptr, s.docAutoCorrect)) {
+                s.docAutoCorrect = !s.docAutoCorrect;
+                theme::save();
+            }
+            ImGui::EndPopup();
+        }
+    }
+
+    ImGui::SameLine(0.0f, 18.0f);
     const bool unsaved = ed.hasUnsavedChanges();
     ui::colorDot(unsaved ? c.warningColor : c.successColor);
     ImGui::SameLine();
@@ -1644,6 +1819,23 @@ void drawDialogs(Editor& ed, ManuscriptState& st, DocumentView& view) {
     if (ImGui::BeginPopup("ms_context")) {
         const bool sel = view.hasSelection();
         const bool writing = !st.readMode;
+        if (!st.spellWord.empty() && writing) {
+            if (st.spellSuggestions.empty()) ui::textSecondary(TR("(keine Vorschlaege)"));
+            for (const std::string& suggestion : st.spellSuggestions) {
+                ImGui::PushFont(theme::fontFor(true, false), 0.0f);
+                if (ImGui::MenuItem(suggestion.c_str())) {
+                    docops::replaceRaw(doc, view, st.spellBegin, st.spellEnd, suggestion);
+                    done(view);
+                }
+                ImGui::PopFont();
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem(TR("Alle ignorieren"))) spell::ignoreForSession(st.spellWord);
+            ui::tooltip(TR("Bis zum Neustart nicht mehr markieren"));
+            if (ImGui::MenuItem(TR("Zum Woerterbuch hinzufuegen"))) spell::addToDictionary(st.spellWord);
+            ui::tooltip(TR("Gilt dauerhaft als richtig (eigene Liste des Programms)"));
+            ImGui::Separator();
+        }
         if (ImGui::MenuItem(TR("Ausschneiden"), TR("Strg+X"), false, sel && writing)) docops::cut(doc, view);
         if (ImGui::MenuItem(TR("Kopieren"), TR("Strg+C"), false, sel)) docops::copy(doc, view);
         if (ImGui::MenuItem(TR("Einfuegen"), TR("Strg+V"), false, writing)) docops::paste(doc, view);
@@ -1883,6 +2075,20 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
         st.registered = true;
     }
     st.doc.sync(ed);
+    {
+        const AppSettings& cfg = theme::settings();
+        if (cfg.docSpellCheck || cfg.docAutoCorrect) {
+            const std::string tag = resolveLanguage(cfg.docLanguage);
+            if (spell::language() != tag) spell::setLanguage(tag);
+            // Namen der Elemente gelten als richtig geschrieben
+            if (st.namesSignature != st.doc.projectSignature()) {
+                std::vector<std::string> names;
+                for (const Element& el : ed.project.elements) names.push_back(el.name);
+                spell::setKnownNames(names);
+                st.namesSignature = st.doc.projectSignature();
+            }
+        }
+    }
     if (!st.split) {
         st.main.activeView = true;
         st.second.activeView = false;
@@ -1901,6 +2107,16 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
             st.showFind = true;
             st.showReplace = false;
             st.findFocus = true;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_F7, false) && !st.readMode && theme::settings().docSpellCheck) {
+            DocumentView& target = activeView(st);
+            size_t b = 0, e = 0;
+            if (docops::findSpellingError(st.doc, target.selEnd(), &b, &e)) {
+                target.select(b, e);
+                done(target);
+            } else {
+                ed.setStatus(TR("Keine Rechtschreibfehler gefunden."));
+            }
         }
         if (ctrl && ImGui::IsKeyPressed(ImGuiKey_H, false) && !st.readMode) {
             st.showFind = true;
@@ -1942,8 +2158,8 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
 
     ImGui::BeginGroup();
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 0.0f));
-    const float rulerH = (s.docShowRuler && !st.focusMode && !st.readMode) ? ImGui::GetFontSize() * 1.2f : 0.0f;
-    if (rulerH > 0.0f) st.main.drawRuler(opt, rulerH);
+    const float rulerH = (s.docShowRuler && !st.focusMode && !st.readMode) ? ImGui::GetFontSize() * 1.5f : 0.0f;
+    if (rulerH > 0.0f) activeView(st).drawRuler(st.doc, opt, rulerH);
     const float colW = ImGui::GetContentRegionAvail().x;
     const float viewsH = std::max(40.0f, mainH - rulerH);
     DocEvent ev1, ev2;
@@ -1998,6 +2214,10 @@ void drawManuscriptWindow(Editor& ed, bool* open) {
                 break;
             case DocEvent::Kind::ContextMenu:
                 st.openContext = true;
+                st.spellWord = ev->spellWord;
+                st.spellBegin = ev->spellBegin;
+                st.spellEnd = ev->spellEnd;
+                st.spellSuggestions = ev->spellWord.empty() ? std::vector<std::string>() : spell::suggest(ev->spellWord);
                 break;
             default:
                 break;

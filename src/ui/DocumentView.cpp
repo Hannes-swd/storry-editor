@@ -1,6 +1,7 @@
 #include "ui/DocumentView.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cctype>
 #include <cfloat>
 #include <climits>
@@ -12,6 +13,8 @@
 #include "imgui_internal.h"
 
 #include "core/StoryTime.h"
+#include "app/SpellCheck.h"
+#include "ui/AutoCorrect.h"
 #include "ui/Editor.h"
 #include "ui/Lang.h"
 #include "ui/Theme.h"
@@ -60,6 +63,7 @@ LineModel buildModel(const std::string& text, const std::vector<ManuscriptToken>
     m.kind = L.kind;
     m.level = L.level;
     m.align = L.align;
+    m.format = L.format;
     if (m.atomic()) {
         m.atomicRaw = text.substr(L.begin, L.end - L.begin);
         return m;
@@ -154,7 +158,9 @@ std::string serializeLine(const LineModel& m, std::vector<size_t>* positions, si
         out += serializeUnits(m.units, &p);
         for (size_t v : p) positions->push_back(v + *contentStart);
     }
-    out += alignMarker(m.align);
+    ParagraphFormat format = m.format;
+    format.align = m.align;
+    out += paragraphMarker(format);
     return out;
 }
 
@@ -658,6 +664,8 @@ void newParagraph(ManuscriptDoc& doc, DocumentView& view) {
     LineModel next;
     next.kind = m.kind == LineKind::Heading ? LineKind::Body : m.kind;
     next.align = m.kind == LineKind::Heading ? LineAlign::Left : m.align;
+    // Einzuege und Tabstopps gehen wie in Word auf den neuen Absatz ueber.
+    if (m.kind != LineKind::Heading) next.format = m.format;
     next.prefix = linePrefix(next.kind, 0);
     std::vector<LineModel> frag(2);
     frag[1] = next;
@@ -830,6 +838,20 @@ void setAlign(ManuscriptDoc& doc, DocumentView& view, LineAlign align) {
     rewriteLines(doc, view, la, lb, [&](LineModel& m, size_t, size_t) { m.align = align; });
 }
 
+void setParagraphFormat(ManuscriptDoc& doc, DocumentView& view,
+                        const std::function<void(ParagraphFormat&)>& change) {
+    size_t la = 0, lb = 0;
+    affectedLines(doc, view, &la, &lb);
+    rewriteLines(doc, view, la, lb, [&](LineModel& m, size_t, size_t) {
+        ParagraphFormat f = m.format;
+        f.align = m.align;
+        change(f);
+        std::sort(f.tabs.begin(), f.tabs.end());
+        m.format = f;
+        m.align = f.align;
+    });
+}
+
 const ManuscriptLine* caretLine(ManuscriptDoc& doc, DocumentView& view) {
     const std::vector<ManuscriptLine>& lines = doc.lines();
     if (lines.empty()) return nullptr;
@@ -909,6 +931,41 @@ void paste(ManuscriptDoc& doc, DocumentView& view) {
     typeText(doc, view, text, false);
 }
 
+bool findSpellingError(ManuscriptDoc& doc, size_t from, size_t* begin, size_t* end) {
+    if (!spell::available()) return false;
+    const std::vector<ManuscriptLine> lines = doc.lines();
+    if (lines.empty()) return false;
+    const size_t start = lineIndexAt(lines, from);
+    for (size_t step = 0; step <= lines.size(); ++step) {
+        const size_t li = (start + step) % lines.size();
+        if (isAtomicKind(lines[li].kind)) continue;
+        const LineModel m = doc.model(li);
+        std::string plain;
+        std::vector<size_t> pos;
+        for (size_t k = 0; k < m.units.size(); ++k) {
+            if (m.info[k].atom || m.info[k].group >= 0) {
+                plain += ' ';
+                pos.push_back(m.info[k].pos);
+                continue;
+            }
+            for (size_t j = 0; j < m.units[k].raw.size(); ++j) {
+                plain += m.units[k].raw[j];
+                pos.push_back(m.info[k].pos + j);
+            }
+        }
+        for (const spell::Issue& issue : spell::check(plain)) {
+            if (issue.end == 0 || issue.end > pos.size()) continue;
+            const size_t a = pos[issue.begin], b = pos[issue.end - 1] + 1;
+            // In der Startzeile nur, was hinter dem Cursor liegt (beim Umlauf alles).
+            if (step == 0 && a < from) continue;
+            *begin = a;
+            *end = b;
+            return true;
+        }
+    }
+    return false;
+}
+
 void replaceRaw(ManuscriptDoc& doc, DocumentView& view, size_t begin, size_t end,
                 const std::string& text) {
     const size_t caret = begin + text.size();
@@ -942,6 +999,18 @@ void DocumentView::moveCaret(size_t pos, bool extend) {
     blinkStart_ = ImGui::GetTime();
 }
 
+std::vector<std::pair<size_t, size_t>> DocumentView::visibleSpellIssues() const {
+    std::vector<std::pair<size_t, size_t>> out;
+    const LineLayout* last = nullptr;
+    for (const Row& row : rows_) {
+        if (!row.layout || row.layout == last || row.layout->spellGeneration != spell::generation()) continue;
+        last = row.layout;
+        for (const auto& issue : row.layout->spellIssues)
+            out.push_back({row.lineBegin + issue.first, row.lineBegin + issue.second});
+    }
+    return out;
+}
+
 float DocumentView::zoomForPageWidth(const DocOptions& options) const {
     const float w = options.pageWidthCm * kPxPerCm;
     return std::clamp((viewWidth_ - 40.0f) / w, 0.3f, 4.0f);
@@ -970,6 +1039,7 @@ struct LayUnit {
     int label = -1;
     int style = -1;
     bool chip = false;
+    bool tab = false;  // Tabulator: Breite haengt von der Position ab
 };
 
 uint8_t classOf(unsigned int cp) {
@@ -1032,6 +1102,23 @@ void DocumentView::buildLine(ManuscriptDoc& doc, const DocOptions& opt, size_t l
     const LineModel m = buildModel(text, toks, lines, li);
     const bool heading = m.kind == LineKind::Heading;
     const float linePt = heading ? headingPt(m.level) : basePt;
+
+    // Sichtbarer Text fuer die Rechtschreibung: Marken werden zu Leerzeichen.
+    for (size_t k = 0; k < m.units.size(); ++k) {
+        const uint32_t rel = static_cast<uint32_t>(m.info[k].pos - L.begin);
+        if (m.info[k].atom || m.info[k].group >= 0) {
+            if (out.plain.empty() || out.plain.back() != ' ') {
+                out.plain += ' ';
+                out.plainPos.push_back(rel);
+            }
+            continue;
+        }
+        const std::string& raw = m.units[k].raw;
+        for (size_t j = 0; j < raw.size(); ++j) {
+            out.plain += raw[j];
+            out.plainPos.push_back(rel + static_cast<uint32_t>(j));
+        }
+    }
     const float linePx = linePt * kPxPerPt * z;
     ImFont* lineFont = theme::familyFont(opt.font, heading, false);
     out.spaceBefore = heading ? linePx * (m.level <= 1 ? 0.3f : 0.75f) : 0.0f;
@@ -1115,7 +1202,8 @@ void DocumentView::buildLine(ManuscriptDoc& doc, const DocOptions& opt, size_t l
         lu.chip = !opt.readMode && info.group >= 0;
         if (cp == '\t') {
             lu.kind = 1;
-            lu.adv = 1.25f * kPxPerCm * z;
+            lu.tab = true;
+            lu.adv = 1.25f * kPxPerCm * z;  // wird beim Umbruch nach den Tabstopps berechnet
         } else {
             lu.kind = cp == ' ' ? 1 : 0;
             lu.adv = lu.font->GetFontBaked(lu.px)->GetCharAdvance(static_cast<ImWchar>(cp));
@@ -1125,9 +1213,23 @@ void DocumentView::buildLine(ManuscriptDoc& doc, const DocOptions& opt, size_t l
     }
 
     // --------------------------------------------------------- Umbruch
+    // Einzuege aus dem Lineal: linker Einzug, Erstzeileneinzug, rechter Einzug.
     const bool list = m.kind == LineKind::Bullet || m.kind == LineKind::Numbered;
-    const float indent = list ? 0.63f * kPxPerCm * z : 0.0f;
-    const float avail = std::max(20.0f, contentW - indent);
+    const float cmPx = kPxPerCm * z;
+    const ParagraphFormat& pf = L.format;
+    const float listIndent = list ? 0.63f * cmPx : 0.0f;
+    const float leftPx = pf.left * cmPx, rightPx = pf.right * cmPx, firstPx = pf.first * cmPx;
+    auto rowStart = [&](size_t row) { return leftPx + (row == 0 ? firstPx : 0.0f) + listIndent; };
+    auto availFor = [&](size_t row) { return std::max(20.0f, contentW - rowStart(row) - rightPx); };
+    // Naechster Tabstopp rechts von p (Pixel ab dem linken Seitenrand); hinter
+    // den eigenen Tabstopps gelten die Standardstopps alle 1,25 cm.
+    auto nextTab = [&](float p) {
+        for (float t : pf.tabs) {
+            if (t * cmPx > p + 0.5f) return t * cmPx;
+        }
+        const float step = 1.25f * cmPx;
+        return (std::floor(p / step + 0.001f) + 1.0f) * step;
+    };
     struct Span {
         size_t b, e;
     };
@@ -1136,14 +1238,22 @@ void DocumentView::buildLine(ManuscriptDoc& doc, const DocOptions& opt, size_t l
         size_t rs = 0;
         float x = 0.0f;
         size_t lastBreak = kNone;
+        auto tabWidth = [&](float at) {
+            const float abs = rowStart(spans.size()) + at;
+            return std::max(1.0f, nextTab(abs) - abs);
+        };
         for (size_t k = 0; k < u.size(); ++k) {
+            if (u[k].tab) u[k].adv = tabWidth(x);
             const float w = u[k].adv;
-            if (u[k].kind != 1 && x + w > avail && k > rs) {
+            if (u[k].kind != 1 && x + w > availFor(spans.size()) && k > rs) {
                 const size_t cut = (lastBreak != kNone && lastBreak > rs) ? lastBreak : k;
                 spans.push_back({rs, cut});
                 rs = cut;
                 x = 0.0f;
-                for (size_t j = cut; j < k; ++j) x += u[j].adv;
+                for (size_t j = cut; j < k; ++j) {
+                    if (u[j].tab) u[j].adv = tabWidth(x);
+                    x += u[j].adv;
+                }
                 lastBreak = kNone;
             }
             x += w;
@@ -1178,6 +1288,7 @@ void DocumentView::buildLine(ManuscriptDoc& doc, const DocOptions& opt, size_t l
             rowW += u[k].adv;
             if (u[k].kind == 1) ++spaces;
         }
+        const float avail = availFor(si);
         float offset = 0.0f, extra = 0.0f;
         switch (m.align) {
             case LineAlign::Center: offset = std::max(0.0f, (avail - rowW) * 0.5f); break;
@@ -1187,14 +1298,14 @@ void DocumentView::buildLine(ManuscriptDoc& doc, const DocOptions& opt, size_t l
                 break;
             default: break;
         }
-        float x = indent + offset;
+        float x = rowStart(si) + offset;
 
         if (si == 0 && list) {
             Frag b;
             b.kind = FragKind::Bullet;
             b.font = baseFont;
             b.px = basePx;
-            b.x = indent * 0.2f;
+            b.x = leftPx + firstPx + listIndent * 0.2f;
             b.label = addLabel(m.kind == LineKind::Bullet ? std::string("\xE2\x80\xA2") : std::to_string(L.number) + ".");
             out.frags.push_back(b);
         }
@@ -1209,7 +1320,8 @@ void DocumentView::buildLine(ManuscriptDoc& doc, const DocOptions& opt, size_t l
             stop.cls = lu.cls;
             out.stops.push_back(stop);
 
-            const float w = lu.adv + (lu.kind == 1 && k < lastInk ? extra : 0.0f);
+            const float adv = lu.tab ? std::max(1.0f, nextTab(x) - x) : lu.adv;
+            const float w = adv + (lu.kind == 1 && !lu.tab && k < lastInk ? extra : 0.0f);
             if (lu.kind == 2) {
                 Frag f;
                 f.kind = FragKind::Atom;
@@ -1290,20 +1402,24 @@ void DocumentView::layout(ManuscriptDoc& doc, const DocOptions& opt, float viewW
         pageWidthPx_ = opt.pageWidthCm * kPxPerCm * z;
         pageHeightPx_ = opt.pageHeightCm * kPxPerCm * z;
         marginPx_ = opt.marginCm * kPxPerCm * z;
+        marginLeftPx_ = opt.marginLeftCm * kPxPerCm * z;
+        marginRightPx_ = opt.marginRightCm * kPxPerCm * z;
         pageLeft_ = std::max(pageGap_, (viewWidth - pageWidthPx_) * 0.5f);
         docWidth_ = std::max(viewWidth, pageWidthPx_ + 2.0f * pageGap_);
-        contentW = pageWidthPx_ - 2.0f * marginPx_;
+        contentW = std::max(40.0f, pageWidthPx_ - marginLeftPx_ - marginRightPx_);
     } else {
         // Endlosrolle: volle Breite, schmaler Rand - wie die Weblayout-Ansicht
         pageLeft_ = 0.0f;
         pageWidthPx_ = viewWidth;
         marginPx_ = std::min(opt.marginCm * kPxPerCm * z, viewWidth * 0.08f);
+        marginLeftPx_ = std::min(opt.marginLeftCm * kPxPerCm * z, viewWidth * 0.08f);
+        marginRightPx_ = std::min(opt.marginRightCm * kPxPerCm * z, viewWidth * 0.08f);
         docWidth_ = viewWidth;
-        contentW = std::max(80.0f, viewWidth - 2.0f * marginPx_);
+        contentW = std::max(80.0f, viewWidth - marginLeftPx_ - marginRightPx_);
         topPad = 20.0f * z;
     }
     const float pageContentH = pageHeightPx_ - 2.0f * marginPx_;
-    const float contentLeft = pageLeft_ + marginPx_;
+    const float contentLeft = pageLeft_ + marginLeftPx_;
     const float basePx = opt.fontPt * kPxPerPt * z;
     ImFont* baseFont = theme::familyFont(opt.font, false, false);
     ImFont* uiFont = theme::fonts().regular ? theme::fonts().regular : ImGui::GetFont();
@@ -1422,6 +1538,8 @@ void DocumentView::layout(ManuscriptDoc& doc, const DocOptions& opt, float viewW
             r.right = contentLeft + contentW;
             r.firstStop = stops_.size();
             r.firstFrag = frags_.size();
+            r.layout = &ll;
+            r.lineBegin = L.begin;
             const int rowIndex = static_cast<int>(rows_.size());
             if (lineFirstStop_[li] == kNone && part.stopCount > 0) lineFirstStop_[li] = stops_.size();
             for (uint32_t k = part.firstStop; k < part.firstStop + part.stopCount; ++k) {
@@ -1677,8 +1795,10 @@ void DocumentView::handleKeys(ManuscriptDoc& doc, const DocOptions& opt, bool cl
         }
     }
 
-    if (!claimKeys && (press(ImGuiKey_Enter) || press(ImGuiKey_KeypadEnter)))
+    if (!claimKeys && (press(ImGuiKey_Enter) || press(ImGuiKey_KeypadEnter))) {
+        if (opt.autoCorrect) autocorrect::beforeParagraph(doc, *this, opt.language);
         docops::newParagraph(doc, *this);
+    }
     if (press(ImGuiKey_Backspace)) docops::backspace(doc, *this, ctrl);
     if (press(ImGuiKey_Delete)) docops::deleteForward(doc, *this, ctrl);
     if (!claimKeys && press(ImGuiKey_Tab)) docops::typeText(doc, *this, "\t", true);
@@ -1753,7 +1873,11 @@ void DocumentView::handleKeys(ManuscriptDoc& doc, const DocOptions& opt, bool cl
             ImTextCharToUtf8(buf, static_cast<unsigned int>(c));
             typed += buf;
         }
-        if (!typed.empty()) docops::typeText(doc, *this, typed, true);
+        if (!typed.empty()) {
+            if (opt.autoCorrect) typed = autocorrect::transformTyped(doc.text(), cursor, typed, opt.language);
+            docops::typeText(doc, *this, typed, true);
+            if (opt.autoCorrect) autocorrect::afterTyped(doc, *this, typed, opt.language);
+        }
     }
 
     if (cursor != cursorBefore || anchor != anchorBefore || doc.generation() != genBefore) {
@@ -1782,13 +1906,15 @@ DocEvent DocumentView::draw(ManuscriptDoc& doc, const DocOptions& opt, ImVec2 si
         ImGui::FocusWindow(win);
         wantFocus_ = false;
     }
+    viewMin_ = win->InnerRect.Min;
+    viewMax_ = win->InnerRect.Max;
     viewWidth_ = win->InnerRect.GetWidth();
     viewHeight_ = win->InnerRect.GetHeight();
 
     // ---------------------------------------------------------- Layout
     uint64_t sig = doc.projectSignature();
     sig = mixHash(sig, std::hash<std::string>{}(opt.font));
-    for (float v : {opt.zoom, opt.pageWidthCm, opt.pageHeightCm, opt.marginCm, opt.fontPt,
+    for (float v : {opt.zoom, opt.pageWidthCm, opt.pageHeightCm, opt.marginCm, opt.marginLeftCm, opt.marginRightCm, opt.fontPt,
                     opt.lineSpacing})
         sig = mixHash(sig, static_cast<uint64_t>(v * 1000.0f));
     sig = mixHash(sig, (opt.readMode ? 1u : 0u) | (opt.showMarks ? 2u : 0u) | (opt.pageView ? 4u : 0u));
@@ -1874,6 +2000,20 @@ DocEvent DocumentView::draw(ManuscriptDoc& doc, const DocOptions& opt, ImVec2 si
             if (!hasSelection() || pos < selBegin() || pos > selEnd()) moveCaret(pos, false);
             ev.kind = DocEvent::Kind::ContextMenu;
             ev.pos = pos;
+            if (opt.spellCheck && !stops_.empty()) {
+                const Row& row = rows_[static_cast<size_t>(stops_[stopIndex(pos)].row)];
+                if (row.layout && row.layout->spellGeneration == spell::generation()) {
+                    for (const auto& issue : row.layout->spellIssues) {
+                        const size_t a = row.lineBegin + issue.first, b = row.lineBegin + issue.second;
+                        if (a <= pos && pos <= b) {
+                            ev.spellBegin = a;
+                            ev.spellEnd = b;
+                            ev.spellWord = doc.text().substr(a, b - a);
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
     if (dragging_) {
@@ -2170,6 +2310,50 @@ DocEvent DocumentView::draw(ManuscriptDoc& doc, const DocOptions& opt, ImVec2 si
     }
     if (overClickable && io.KeyCtrl) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 
+    // ------------------------------------------------- Rechtschreibung
+    // Geprueft wird nur, was sichtbar ist, und hoechstens ein paar
+    // Millisekunden pro Frame - der Rest folgt in den naechsten Frames.
+    if (opt.spellCheck && !opt.readMode && spell::available()) {
+        const uint64_t generation = spell::generation();
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(4);
+        for (size_t r = firstRow; r < lastRow; ++r) {
+            LineLayout* ll = rows_[r].layout;
+            if (!ll || ll->spellGeneration == generation) continue;
+            if (std::chrono::steady_clock::now() > deadline) break;
+            ll->spellIssues.clear();
+            for (const spell::Issue& issue : spell::check(ll->plain)) {
+                if (issue.end == 0 || issue.end > ll->plainPos.size()) continue;
+                ll->spellIssues.push_back({ll->plainPos[issue.begin], ll->plainPos[issue.end - 1] + 1});
+            }
+            ll->spellGeneration = generation;
+        }
+        const ImU32 wave = theme::u32(c.errorColor);
+        for (size_t r = firstRow; r < lastRow; ++r) {
+            const Row& row = rows_[r];
+            if (!row.layout || row.layout->spellGeneration != generation || row.stopCount == 0) continue;
+            const Stop& firstStop = stops_[row.firstStop];
+            const Stop& lastStop = stops_[row.firstStop + row.stopCount - 1];
+            for (const auto& issue : row.layout->spellIssues) {
+                const size_t a = row.lineBegin + issue.first, b = row.lineBegin + issue.second;
+                if (b <= firstStop.pos || a > lastStop.pos) continue;
+                // Das Wort, an dem gerade getippt wird, bleibt unmarkiert.
+                if (focused_ && !hasSelection() && cursor >= a && cursor <= b) continue;
+                const float x0 = a <= firstStop.pos ? firstStop.x : stopX(a, nullptr);
+                const float x1 = b >= lastStop.pos ? lastStop.x : stopX(b, nullptr);
+                if (x1 <= x0 + 1.0f) continue;
+                const float y = o.y + row.baseline + std::max(2.0f, opt.fontPt * kPxPerPt * opt.zoom * 0.16f);
+                const float step = std::max(2.0f, 2.2f * opt.zoom);
+                ImVec2 pts[256];
+                int count = 0;
+                for (float x = o.x + x0; x <= o.x + x1 && count < 256; x += step) {
+                    pts[count] = ImVec2(x, y + ((count % 2) ? step * 0.6f : 0.0f));
+                    ++count;
+                }
+                if (count >= 2) dl->AddPolyline(pts, count, wave, 0, std::max(1.0f, opt.zoom));
+            }
+        }
+    }
+
     // ------------------------------------------------------- Cursor
     caretValid_ = false;
     if (!stops_.empty() && !opt.readMode) {
@@ -2207,11 +2391,19 @@ DocEvent DocumentView::draw(ManuscriptDoc& doc, const DocOptions& opt, ImVec2 si
 }
 
 // ------------------------------------------------------------------ Lineal
-void DocumentView::drawRuler(const DocOptions& opt, float height) {
+// Wie in Word: graue Raender, weisser Textbereich, darauf die Einzugsmarken
+// des Absatzes am Cursor (oben Erstzeile, unten haengend/links mit Kaestchen,
+// rechts) und seine Tabstopps. Ziehen aendert, Klick setzt einen Tabstopp,
+// einen Tabstopp aus dem Lineal ziehen entfernt ihn.
+void DocumentView::drawRuler(ManuscriptDoc& doc, const DocOptions& opt, float height) {
     const ColorScheme& c = theme::colors();
+    ImGuiIO& io = ImGui::GetIO();
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
-    const float width = ImGui::GetContentRegionAvail().x;
-    ImGui::Dummy(ImVec2(width, height));
+    const float width = std::max(1.0f, ImGui::GetContentRegionAvail().x);
+    ImGui::InvisibleButton("##ruler", ImVec2(width, height));
+    const bool hovered = ImGui::IsItemHovered();
+    const bool active = ImGui::IsItemActive();
+    const bool clicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 p1(p0.x + width, p0.y + height);
     dl->PushClipRect(p0, p1, true);
@@ -2221,42 +2413,258 @@ void DocumentView::drawRuler(const DocOptions& opt, float height) {
     const float cm = kPxPerCm * z;
     const float pageX = rulerOrigin_.x;
     const float pageW = opt.pageView ? opt.pageWidthCm * cm : viewWidth_;
-    const float margin = marginPx_;
-    const float top = p0.y + height * 0.18f, bottom = p1.y - height * 0.12f;
-    dl->AddRectFilled(ImVec2(pageX, top), ImVec2(pageX + pageW, bottom),
+    const float textL = pageX + marginLeftPx_;
+    const float textR = pageX + pageW - marginRightPx_;
+    const float top = p0.y + 2.0f, bottom = p1.y - 2.0f;
+    const float mid = (top + bottom) * 0.5f;
+    dl->AddRectFilled(ImVec2(pageX, top + 3.0f), ImVec2(pageX + pageW, bottom - 3.0f),
                       theme::u32(theme::mix(c.pageColor, c.workspaceColor, 0.45f)));
-    dl->AddRectFilled(ImVec2(pageX + margin, top), ImVec2(pageX + pageW - margin, bottom),
-                      theme::u32(c.pageColor));
+    dl->AddRectFilled(ImVec2(textL, top + 3.0f), ImVec2(textR, bottom - 3.0f), theme::u32(c.pageColor));
 
     // Teilstriche ab dem linken Rand, wie in Word
     const ImU32 tick = theme::u32(theme::withAlpha(c.pageTextColor, 0.55f));
-    const float zero = pageX + margin;
-    ImFont* f = theme::fonts().regular ? theme::fonts().regular : ImGui::GetFont();
-    const float fontPx = std::min(height * 0.55f, 11.0f);
-    const int quarters = static_cast<int>(std::ceil(pageW / (cm * 0.25f)));
+    ImFont* font = theme::fonts().regular ? theme::fonts().regular : ImGui::GetFont();
+    const float fontPx = std::min(height * 0.45f, 11.0f);
+    const int quarters = static_cast<int>(std::ceil(pageW / (cm * 0.25f))) + 1;
     for (int side = -1; side <= 1; side += 2) {
         for (int q = side < 0 ? 1 : 0; q <= quarters; ++q) {
-            const float x = zero + static_cast<float>(side * q) * cm * 0.25f;
+            const float x = textL + static_cast<float>(side * q) * cm * 0.25f;
             if (x < pageX || x > pageX + pageW) continue;
-            const float mid = (top + bottom) * 0.5f;
             if (q % 4 == 0) {
                 if (q == 0) continue;
                 char num[8];
                 std::snprintf(num, sizeof(num), "%d", q / 4);
-                const ImVec2 ts = f->CalcTextSizeA(fontPx, FLT_MAX, 0.0f, num);
-                dl->AddText(f, fontPx, ImVec2(x - ts.x * 0.5f, mid - ts.y * 0.5f), tick, num);
+                const ImVec2 ts = font->CalcTextSizeA(fontPx, FLT_MAX, 0.0f, num);
+                dl->AddText(font, fontPx, ImVec2(x - ts.x * 0.5f, mid - ts.y * 0.5f), tick, num);
             } else {
-                const float len = (q % 2 == 0 ? 0.28f : 0.14f) * (bottom - top);
+                const float len = (q % 2 == 0 ? 0.22f : 0.1f) * (bottom - top);
                 dl->AddLine(ImVec2(x, mid - len), ImVec2(x, mid + len), tick);
             }
         }
     }
-    // Randmarken
+
+    // Absatz am Cursor
+    const ManuscriptLine* line = opt.readMode ? nullptr : docops::caretLine(doc, *this);
+    const bool editable = line && line->kind != LineKind::Time && line->kind != LineKind::Break;
+    const ParagraphFormat pf = editable ? line->format : ParagraphFormat();
+    auto snap = [&](float v) { return io.KeyAlt ? std::round(v * 100.0f) / 100.0f : std::round(v * 4.0f) / 4.0f; };
+    const float mouseCm = (io.MousePos.x - textL) / cm;
+
+    const float firstX = textL + (pf.left + pf.first) * cm;
+    const float leftX = textL + pf.left * cm;
+    const float rightX = textR - pf.right * cm;
+    const float s = std::max(4.0f, height * 0.22f);  // Groesse der Dreiecke
+
+    // --------------------------------------------------- Greifen
+    auto near = [&](float x, float y0, float y1) {
+        return std::fabs(io.MousePos.x - x) <= s + 1.0f && io.MousePos.y >= y0 && io.MousePos.y <= y1;
+    };
+    auto hitMarker = [&]() -> RulerDrag {
+        if (editable) {
+            if (near(firstX, top, mid - 1.0f)) return RulerDrag::First;
+            if (near(leftX, bottom - s * 0.9f, bottom + 2.0f)) return RulerDrag::LeftBoth;
+            if (near(leftX, mid, bottom - s * 0.9f)) return RulerDrag::Hanging;
+            if (near(rightX, mid, bottom + 2.0f)) return RulerDrag::Right;
+            for (float t : pf.tabs) {
+                if (std::fabs(io.MousePos.x - (textL + t * cm)) <= 4.0f && io.MousePos.y >= mid) return RulerDrag::Tab;
+            }
+        }
+        if (opt.pageView && std::fabs(io.MousePos.x - textL) <= 4.0f) return RulerDrag::MarginLeft;
+        if (opt.pageView && std::fabs(io.MousePos.x - textR) <= 4.0f) return RulerDrag::MarginRight;
+        return RulerDrag::None;
+    };
+    const RulerDrag under = hovered && rulerDrag_ == RulerDrag::None ? hitMarker() : RulerDrag::None;
+    if (under == RulerDrag::MarginLeft || under == RulerDrag::MarginRight || rulerDrag_ == RulerDrag::MarginLeft ||
+        rulerDrag_ == RulerDrag::MarginRight)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    else if (under != RulerDrag::None || rulerDrag_ != RulerDrag::None)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
+    if (clicked) {
+        rulerDrag_ = hitMarker();
+        if (rulerDrag_ == RulerDrag::Tab) {
+            float best = FLT_MAX;
+            for (float t : pf.tabs) {
+                const float d = std::fabs(io.MousePos.x - (textL + t * cm));
+                if (d < best) {
+                    best = d;
+                    rulerTabFrom_ = t;
+                }
+            }
+        } else if (rulerDrag_ == RulerDrag::None && editable && io.MousePos.x > textL && io.MousePos.x < textR) {
+            // Klick ins Lineal: neuer Tabstopp an dieser Stelle - direkt zum Weiterziehen
+            const float at = snap(mouseCm);
+            if (at > 0.0f) {
+                docops::setParagraphFormat(doc, *this, [&](ParagraphFormat& f) {
+                    bool exists = false;
+                    for (float t : f.tabs) exists = exists || std::fabs(t - at) < 0.01f;
+                    if (!exists) f.tabs.push_back(at);
+                });
+                rulerDrag_ = RulerDrag::Tab;
+                rulerTabFrom_ = at;
+            }
+        }
+    }
+
+    // --------------------------------------------------- Ziehen
+    float value = 0.0f;  // neuer Wert in cm fuer die Anzeige
+    bool removeTab = false;
+    if (rulerDrag_ != RulerDrag::None) {
+        const float x = io.MousePos.x;
+        switch (rulerDrag_) {
+            case RulerDrag::MarginLeft: value = std::clamp(snap((x - pageX) / cm), 0.0f, pageW / cm - opt.marginRightCm - 2.0f); break;
+            case RulerDrag::MarginRight: value = std::clamp(snap((pageX + pageW - x) / cm), 0.0f, pageW / cm - opt.marginLeftCm - 2.0f); break;
+            case RulerDrag::Right: value = snap((textR - x) / cm); break;
+            case RulerDrag::Tab:
+                value = snap(mouseCm);
+                removeTab = io.MousePos.y > p1.y + height || io.MousePos.y < p0.y - height || value <= 0.0f;
+                break;
+            default: value = snap(mouseCm); break;  // First, Hanging, LeftBoth: Position ab dem linken Rand
+        }
+        const float guideX = [&]() {
+            switch (rulerDrag_) {
+                case RulerDrag::MarginLeft: return pageX + value * cm;
+                case RulerDrag::MarginRight: return pageX + pageW - value * cm;
+                case RulerDrag::Right: return textR - value * cm;
+                default: return textL + value * cm;
+            }
+        }();
+        // gestrichelte Hilfslinie ueber die Seite
+        if (!removeTab) {
+            ImDrawList* fg = ImGui::GetForegroundDrawList();
+            for (float y = viewMin_.y; y < viewMax_.y; y += 8.0f)
+                fg->AddLine(ImVec2(guideX, y), ImVec2(guideX, std::min(y + 4.0f, viewMax_.y)),
+                            theme::u32(theme::withAlpha(c.pageTextColor, 0.6f)));
+        }
+        const char* what = "";
+        switch (rulerDrag_) {
+            case RulerDrag::MarginLeft: what = TR("Seitenrand links"); break;
+            case RulerDrag::MarginRight: what = TR("Seitenrand rechts"); break;
+            case RulerDrag::First: what = TR("Erste Zeile"); break;
+            case RulerDrag::Hanging: what = TR("Haengender Einzug"); break;
+            case RulerDrag::LeftBoth: what = TR("Einzug links"); break;
+            case RulerDrag::Right: what = TR("Einzug rechts"); break;
+            case RulerDrag::Tab: what = removeTab ? TR("Tabstopp entfernen") : TR("Tabstopp"); break;
+            default: break;
+        }
+        if (removeTab)
+            ImGui::SetTooltip("%s", what);
+        else
+            ImGui::SetTooltip("%s: %.2f cm", what, value);
+
+        if (!active && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            // Loslassen: uebernehmen - ein Undo-Schritt
+            AppSettings& settings = theme::settings();
+            switch (rulerDrag_) {
+                case RulerDrag::MarginLeft:
+                    settings.docMarginLeftCm = value;
+                    theme::save();
+                    break;
+                case RulerDrag::MarginRight:
+                    settings.docMarginRightCm = value;
+                    theme::save();
+                    break;
+                case RulerDrag::First:
+                    docops::setParagraphFormat(doc, *this, [&](ParagraphFormat& f) { f.first = value - f.left; });
+                    break;
+                case RulerDrag::Hanging:
+                    // Linker Einzug wandert, die erste Zeile bleibt stehen
+                    docops::setParagraphFormat(doc, *this, [&](ParagraphFormat& f) {
+                        const float firstLine = f.left + f.first;
+                        f.left = value;
+                        f.first = firstLine - value;
+                    });
+                    break;
+                case RulerDrag::LeftBoth:
+                    docops::setParagraphFormat(doc, *this, [&](ParagraphFormat& f) { f.left = value; });
+                    break;
+                case RulerDrag::Right:
+                    docops::setParagraphFormat(doc, *this, [&](ParagraphFormat& f) { f.right = value; });
+                    break;
+                case RulerDrag::Tab: {
+                    const float from = rulerTabFrom_;
+                    docops::setParagraphFormat(doc, *this, [&](ParagraphFormat& f) {
+                        f.tabs.erase(std::remove_if(f.tabs.begin(), f.tabs.end(),
+                                                    [&](float t) { return std::fabs(t - from) < 0.01f; }),
+                                     f.tabs.end());
+                        if (!removeTab) f.tabs.push_back(value);
+                    });
+                    break;
+                }
+                default: break;
+            }
+            rulerDrag_ = RulerDrag::None;
+            requestFocus();
+        }
+    }
+
+    // --------------------------------------------------- Marken zeichnen
     const ImU32 marker = theme::u32(c.textSecondary);
-    for (float x : {pageX + margin, pageX + pageW - margin}) {
-        dl->AddTriangleFilled(ImVec2(x - 4, bottom), ImVec2(x + 4, bottom), ImVec2(x, bottom - 5), marker);
+    const ImU32 markerFill = theme::u32(theme::mix(c.pageColor, c.textSecondary, 0.25f));
+    auto downTriangle = [&](float x, bool ghost) {
+        const ImVec2 a(x - s, top), b(x + s, top), d(x, top + s * 1.1f);
+        dl->AddTriangleFilled(a, b, d, ghost ? theme::u32(theme::withAlpha(c.accentColor, 0.5f)) : markerFill);
+        dl->AddTriangle(a, b, d, marker);
+    };
+    auto upTriangle = [&](float x, float base, bool ghost) {
+        const ImVec2 a(x - s, base), b(x + s, base), d(x, base - s * 1.1f);
+        dl->AddTriangleFilled(a, b, d, ghost ? theme::u32(theme::withAlpha(c.accentColor, 0.5f)) : markerFill);
+        dl->AddTriangle(a, b, d, marker);
+    };
+    auto tabMark = [&](float x, bool ghost) {
+        const ImU32 col = ghost ? theme::u32(c.accentColor) : theme::u32(c.pageTextColor);
+        dl->AddLine(ImVec2(x, mid + 1.0f), ImVec2(x, bottom - 1.0f), col, 2.0f);
+        dl->AddLine(ImVec2(x, bottom - 1.0f), ImVec2(x + s * 0.9f, bottom - 1.0f), col, 2.0f);
+    };
+
+    if (editable) {
+        // Standard-Tabstopps hinter dem letzten eigenen: kleine graue Striche
+        const float lastTab = pf.tabs.empty() ? 0.0f : pf.tabs.back();
+        for (float t = (std::floor(lastTab / 1.25f) + 1.0f) * 1.25f; textL + t * cm < textR; t += 1.25f)
+            dl->AddLine(ImVec2(textL + t * cm, bottom - 3.0f), ImVec2(textL + t * cm, bottom), marker);
+
+        for (float t : pf.tabs) {
+            const bool dragged = rulerDrag_ == RulerDrag::Tab && std::fabs(t - rulerTabFrom_) < 0.01f;
+            if (!dragged) tabMark(textL + t * cm, false);
+        }
+        const float baseLeft = bottom - s * 0.9f;
+        downTriangle(firstX, false);
+        upTriangle(leftX, baseLeft, false);
+        dl->AddRectFilled(ImVec2(leftX - s, baseLeft), ImVec2(leftX + s, bottom + 1.0f), markerFill);
+        dl->AddRect(ImVec2(leftX - s, baseLeft), ImVec2(leftX + s, bottom + 1.0f), marker);
+        upTriangle(rightX, bottom, false);
+
+        // Vorschau der gezogenen Marke
+        switch (rulerDrag_) {
+            case RulerDrag::First: downTriangle(textL + value * cm, true); break;
+            case RulerDrag::Hanging:
+            case RulerDrag::LeftBoth: upTriangle(textL + value * cm, baseLeft, true); break;
+            case RulerDrag::Right: upTriangle(textR - value * cm, bottom, true); break;
+            case RulerDrag::Tab:
+                if (!removeTab) tabMark(textL + value * cm, true);
+                break;
+            default: break;
+        }
     }
     dl->PopClipRect();
+
+    if (hovered && rulerDrag_ == RulerDrag::None) {
+        const char* tip = nullptr;
+        switch (under) {
+            case RulerDrag::First: tip = TR("Einzug der ersten Zeile"); break;
+            case RulerDrag::Hanging: tip = TR("Haengender Einzug - die erste Zeile bleibt stehen"); break;
+            case RulerDrag::LeftBoth: tip = TR("Einzug links - verschiebt den ganzen Absatz"); break;
+            case RulerDrag::Right: tip = TR("Einzug rechts"); break;
+            case RulerDrag::Tab: tip = TR("Tabstopp - ziehen verschiebt, aus dem Lineal ziehen entfernt"); break;
+            case RulerDrag::MarginLeft:
+            case RulerDrag::MarginRight: tip = TR("Seitenrand - ziehen, um ihn zu verschieben"); break;
+            default:
+                if (editable && io.MousePos.x > textL && io.MousePos.x < textR)
+                    tip = TR("Klicken setzt einen Tabstopp (Alt: ohne Einrasten)");
+                break;
+        }
+        if (tip) ImGui::SetTooltip("%s", tip);
+    }
 }
 
 }  // namespace se

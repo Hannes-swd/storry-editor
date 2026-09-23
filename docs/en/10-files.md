@@ -106,7 +106,8 @@ What comes out:
 | `!act:…` | **gone** |
 | Bookmarks, comments | **gone** |
 | Every line | One paragraph – just like on the page in the editor |
-| Base font, line spacing, margins, paper size | From **Layout** |
+| Indents and tab stops from the ruler | Real Word indents and tab stops |
+| Base font, line spacing, margins, paper size | From **Layout** and the ruler |
 
 The file is a normal `.docx` and opens in Word, LibreOffice or Google Docs. You do not
 need Word installed – the program builds the package itself.

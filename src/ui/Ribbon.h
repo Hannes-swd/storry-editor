@@ -95,6 +95,8 @@ void word(ImDrawList*, ImVec2, ImVec2, ImU32);
 void help(ImDrawList*, ImVec2, ImVec2, ImU32);
 void settings(ImDrawList*, ImVec2, ImVec2, ImU32);
 void count(ImDrawList*, ImVec2, ImVec2, ImU32);
+void spelling(ImDrawList*, ImVec2, ImVec2, ImU32);
+void autoCorrect(ImDrawList*, ImVec2, ImVec2, ImU32);
 void chevronUp(ImDrawList*, ImVec2, ImVec2, ImU32);
 void chevronDown(ImDrawList*, ImVec2, ImVec2, ImU32);
 }  // namespace icon

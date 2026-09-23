@@ -517,6 +517,19 @@ void count(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col) {
     const float s[1][2] = {{0.05f, 0.95f}};
     lines(dl, P(a, b, 0, 0.5f), b, col, s, 1);
 }
+void spelling(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col) {
+    letter(dl, a, b, col, "abc", regular(), 0.6f, 0.0f, -0.22f);
+    // rote Welle darunter
+    const ImU32 red = theme::u32(theme::colors().errorColor);
+    ImVec2 pts[9];
+    for (int i = 0; i < 9; ++i) pts[i] = P(a, b, 0.05f + 0.1125f * static_cast<float>(i), i % 2 ? 0.78f : 0.9f);
+    dl->AddPolyline(pts, 9, red, 0, 1.5f);
+}
+void autoCorrect(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col) {
+    letter(dl, a, b, col, "A", regular(), 0.8f, -0.2f, -0.05f);
+    dl->AddLine(P(a, b, 0.55f, 0.75f), P(a, b, 0.72f, 0.95f), col, 1.6f);
+    dl->AddLine(P(a, b, 0.72f, 0.95f), P(a, b, 1.0f, 0.4f), col, 1.6f);
+}
 void chevronUp(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col) {
     dl->AddLine(P(a, b, 0.2f, 0.65f), P(a, b, 0.5f, 0.35f), col, 1.5f);
     dl->AddLine(P(a, b, 0.5f, 0.35f), P(a, b, 0.8f, 0.65f), col, 1.5f);

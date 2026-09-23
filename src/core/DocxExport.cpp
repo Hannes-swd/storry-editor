@@ -1,6 +1,7 @@
 #include "core/DocxExport.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <ctime>
 #include <vector>
@@ -173,6 +174,7 @@ struct Para {
     int headingLevel = 0;
     int number = 0;
     LineAlign align = LineAlign::Left;
+    ParagraphFormat format;  // Einzuege und Tabstopps aus dem Lineal
     std::vector<Run> runs;
 };
 
@@ -194,6 +196,7 @@ std::vector<Para> buildParagraphs(const Project& p, const std::string& text) {
         if (line.kind == LineKind::Time) continue;  // steuert nur die Werte
         Para para;
         para.align = line.align;
+        para.format = line.format;
         para.number = line.number;
         switch (line.kind) {
             case LineKind::Break: {
@@ -252,6 +255,9 @@ std::vector<Para> buildParagraphs(const Project& p, const std::string& text) {
     return paras;
 }
 
+// Zentimeter -> Word-Einheit (1/20 Punkt)
+int twips(float cm) { return static_cast<int>(std::lround(cm * 566.93f)); }
+
 // "#C00000" -> "C00000"
 std::string hexOf(const std::string& color) { return color.size() == 7 ? color.substr(1) : color; }
 
@@ -296,10 +302,25 @@ std::string paragraphXml(const Para& para, const DocxOptions& options) {
         props += para.headingLevel == 0
                      ? std::string("<w:pStyle w:val=\"Title\"/>")
                      : "<w:pStyle w:val=\"Heading" + std::to_string(para.headingLevel) + "\"/>";
+    // Reihenfolge wie im OOXML-Schema: Tabs, Abstand, Einzug, Ausrichtung
+    const ParagraphFormat& pf = para.format;
+    if (!pf.tabs.empty()) {
+        props += "<w:tabs>";
+        for (float t : pf.tabs) props += "<w:tab w:val=\"left\" w:pos=\"" + std::to_string(twips(t)) + "\"/>";
+        props += "</w:tabs>";
+    }
     if (para.kind == Para::Kind::SceneBreak)
         props += "<w:spacing w:before=\"240\" w:after=\"240\"/>";
-    if (para.kind == Para::Kind::Bullet || para.kind == Para::Kind::Numbered)
-        props += "<w:ind w:left=\"720\" w:hanging=\"360\"/>";
+    const bool list = para.kind == Para::Kind::Bullet || para.kind == Para::Kind::Numbered;
+    const int left = twips(pf.left) + (list ? 720 : 0);
+    const int right = twips(pf.right);
+    const int first = twips(pf.first) - (list ? 360 : 0);  // Liste: haengender Einzug fuer das Zeichen
+    if (left != 0 || right != 0 || first != 0) {
+        props += "<w:ind w:left=\"" + std::to_string(left) + "\" w:right=\"" + std::to_string(right) + "\"";
+        if (first > 0) props += " w:firstLine=\"" + std::to_string(first) + "\"";
+        if (first < 0) props += " w:hanging=\"" + std::to_string(-first) + "\"";
+        props += "/>";
+    }
     switch (para.align) {
         case LineAlign::Center: props += "<w:jc w:val=\"center\"/>"; break;
         case LineAlign::Right: props += "<w:jc w:val=\"right\"/>"; break;
@@ -380,7 +401,6 @@ std::string stylesXml(const DocxOptions& o) {
            "</w:styles>";
 }
 
-int twips(float cm) { return static_cast<int>(cm * 566.93f + 0.5f); }
 
 }  // namespace
 
@@ -411,9 +431,9 @@ std::string buildManuscriptDocx(const Project& p, const std::string& title,
         "<w:sectPr><w:pgSz w:w=\"" + std::to_string(twips(options.pageWidthCm)) + "\" w:h=\"" +
         std::to_string(twips(options.pageHeightCm)) + "\"/>"
         "<w:pgMar w:top=\"" + std::to_string(twips(options.marginCm)) + "\" w:right=\"" +
-        std::to_string(twips(options.marginCm)) + "\" w:bottom=\"" +
+        std::to_string(twips(options.marginRightCm)) + "\" w:bottom=\"" +
         std::to_string(twips(options.marginCm)) + "\" w:left=\"" +
-        std::to_string(twips(options.marginCm)) + "\" "
+        std::to_string(twips(options.marginLeftCm)) + "\" "
         "w:header=\"708\" w:footer=\"708\" w:gutter=\"0\"/></w:sectPr>"
         "</w:body></w:document>";
 

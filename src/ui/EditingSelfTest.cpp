@@ -4,14 +4,18 @@
 // eine Zwischenablage, die die echte des Systems nicht anfasst.
 #include "ui/EditingSelfTest.h"
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <sstream>
 #include <string>
 
 #include "imgui.h"
 
 #include "app/Platform.h"
+#include "app/SpellCheck.h"
 #include "core/Manuscript.h"
+#include "ui/AutoCorrect.h"
 #include "ui/DocumentView.h"
 #include "ui/Editor.h"
 #include "ui/Theme.h"
@@ -283,6 +287,153 @@ void testLayout(Checks& c) {
     c.check(g.view.pageCount() == 1, "layout: short text fits one page");
 }
 
+// Rechtschreibung ueber Windows - haengt davon ab, welche Sprachen installiert
+// sind; fehlt eine, wird das nur vermerkt.
+void testSpelling(Checks& c) {
+    const bool de = spell::supported("de-DE");
+    const bool en = spell::supported("en-US");
+    c.os << "       Rechtschreibung verfuegbar: de-DE " << (de ? "ja" : "nein") << ", en-US "
+         << (en ? "ja" : "nein") << ", installiert:";
+    for (const std::string& l : spell::installedLanguages()) c.os << " " << l;
+    c.os << "\n";
+    if (de) {
+        spell::setLanguage("de-DE");
+        const std::vector<spell::Issue> issues = spell::check("Das ist ein Tset mit Umlauten: schön grün.");
+        c.check(issues.size() == 1 && issues[0].begin == 12 && issues[0].end == 16,
+                "spell: German typo found at the right bytes", std::to_string(issues.size()));
+        const std::vector<std::string> sugg = spell::suggest("Tset");
+        c.check(std::find(sugg.begin(), sugg.end(), "Test") != sugg.end(), "spell: German suggestion");
+        spell::setKnownNames({"Zyrakel"});
+        c.check(spell::isCorrect("Zyrakel"), "spell: element names count as correct");
+    }
+    if (en) {
+        spell::setLanguage("en-US");
+        c.check(!spell::isCorrect("recieve") && spell::isCorrect("receive"), "spell: English check");
+    }
+}
+
+// Einzuege und Tabstopps aus dem Lineal: Datei, Bearbeiten, Seitenlayout.
+void testRulerFormat(Checks& c) {
+    Fixture f("Ein Absatz.");
+    docops::setParagraphFormat(f.doc, f.view, [](ParagraphFormat& p) {
+        p.left = 2.0f;
+        p.first = -0.5f;
+        p.tabs = {5.0f, 2.5f};
+    });
+    c.check(f.text() == "Ein Absatz.%%pf:left=2;first=-0.5;tabs=2.5,5%%", "ruler: paragraph format written", f.text());
+    const std::vector<ManuscriptLine> lines = manuscriptLines(f.text());
+    c.check(lines[0].format.left == 2.0f && lines[0].format.first == -0.5f && lines[0].format.tabs.size() == 2,
+            "ruler: paragraph format read back");
+    c.check(renderManuscript(f.ed.project, f.text()) == "Ein Absatz.", "ruler: marker invisible in the text");
+    docops::setAlign(f.doc, f.view, LineAlign::Center);
+    c.check(f.text() == "Ein Absatz.%%pf:align=center;left=2;first=-0.5;tabs=2.5,5%%",
+            "ruler: alignment and indents together", f.text());
+    docops::newParagraph(f.doc, f.view);
+    c.check(manuscriptLines(f.text())[1].format.left == 2.0f, "ruler: enter keeps the indents", f.text());
+    docops::setParagraphFormat(f.doc, f.view, [](ParagraphFormat& p) { p = ParagraphFormat(); });
+    c.check(manuscriptLines(f.text())[1].format == ParagraphFormat(), "ruler: indents removed again", f.text());
+    const std::vector<ManuscriptLine> legacy = manuscriptLines("Alt%%right%%");
+    c.check(legacy[0].align == LineAlign::Right && legacy[0].contentEnd == 3, "ruler: old alignment markers still work");
+
+    // Auf der Seite: Einzug verschiebt den Zeilenanfang, Tab springt zum Tabstopp.
+    Fixture g("Ohne Einzug\nMit Einzug%%pf:left=2%%\na\tb%%pf:tabs=5%%");
+    DocOptions opt;
+    opt.font = std::string();
+    auto caretX = [&](size_t pos) {
+        g.view.setCaret(pos);
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2(1200, 900);
+        io.DeltaTime = 1.0f / 60.0f;
+        ImGui::NewFrame();
+        ImGui::Begin("ruler-test");
+        g.view.draw(g.doc, opt, ImVec2(1180, 860), {}, false);
+        ImGui::End();
+        ImGui::EndFrame();
+        return g.view.caretScreenPos().x;
+    };
+    const float cm = 96.0f / 2.54f;
+    caretX(0);  // erster Frame: ImGui kennt die Breite des Schreibfelds erst danach
+    const float plain = caretX(0);
+    const float indented = caretX(g.at("Mit"));
+    c.check(std::fabs(indented - plain - 2.0f * cm) < 1.0f, "ruler: left indent moves the line",
+            std::to_string(indented - plain));
+    const float afterTab = caretX(g.at("b"));
+    c.check(std::fabs(afterTab - plain - 5.0f * cm) < 1.0f, "ruler: tab jumps to the tab stop",
+            std::to_string(afterTab - plain));
+}
+
+// AutoKorrektur: Zeichen fuer Zeichen tippen, wie es die Tastatur tut.
+void typeWithAutoCorrect(Fixture& f, const std::string& text, const std::string& lang) {
+    size_t i = 0;
+    while (i < text.size()) {
+        const unsigned char ch = static_cast<unsigned char>(text[i]);
+        const size_t n = ch < 0x80 ? 1 : (ch >> 5) == 6 ? 2 : (ch >> 4) == 14 ? 3 : 4;
+        const std::string typed = autocorrect::transformTyped(f.text(), f.view.cursor, text.substr(i, n), lang);
+        docops::typeText(f.doc, f.view, typed, true);
+        autocorrect::afterTyped(f.doc, f.view, typed, lang);
+        i += n;
+    }
+}
+
+void testAutoCorrect(Checks& c) {
+    spell::setLanguage("de-DE");
+    Fixture f("");
+    typeWithAutoCorrect(f, "das ist gut. hier geht es weiter ", "de-DE");
+    c.check(f.text() == "Das ist gut. Hier geht es weiter ", "autocorrect: sentence starts capitalised", f.text());
+
+    Fixture g("");
+    typeWithAutoCorrect(g, "Er sagte \"Hallo\" und ging's an.", "de-DE");
+    c.check(g.text() == "Er sagte \xE2\x80\x9EHallo\xE2\x80\x9C und ging\xE2\x80\x99s an.",
+            "autocorrect: German quotation marks and apostrophe", g.text());
+
+    Fixture h("");
+    typeWithAutoCorrect(h, "She said \"hi\" ", "en-GB");
+    c.check(h.text() == "She said \xE2\x80\x9Chi\xE2\x80\x9D ", "autocorrect: English quotation marks", h.text());
+
+    Fixture k("");
+    typeWithAutoCorrect(k, "Und dann... Pause - weiter ", "de-DE");
+    c.check(k.text() == "Und dann\xE2\x80\xA6 Pause \xE2\x80\x93 weiter ", "autocorrect: ellipsis and dash", k.text());
+
+    Fixture m("");
+    typeWithAutoCorrect(m, "DIese Sache ist z.B. nicht neu ", "de-DE");
+    c.check(m.text() == "Diese Sache ist z.B. nicht neu ", "autocorrect: two capitals, no capital after z.B.",
+            m.text());
+
+    Fixture u("");
+    typeWithAutoCorrect(u, "hallo ", "de-DE");
+    u.doc.undo(&u.view);
+    c.check(u.text() == "hallo ", "autocorrect: undo takes back only the correction", u.text());
+
+    // Rote Wellen: der Text wird im unsichtbaren Frame gesetzt und geprueft.
+    Fixture w("## Kapitel\nDie **Strase** war leer, und niemmand sagte @Alice zu Zyrakel.");
+    spell::setKnownNames({"Zyrakel"});
+    DocOptions opt;
+    opt.font = std::string();
+    opt.spellCheck = true;
+    opt.language = "de-DE";
+    for (int pass = 0; pass < 2; ++pass) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2(1200, 900);
+        io.DeltaTime = 1.0f / 60.0f;
+        ImGui::NewFrame();
+        ImGui::Begin("spell-test");
+        w.view.draw(w.doc, opt, ImVec2(1180, 860), {}, false);
+        ImGui::End();
+        ImGui::EndFrame();
+    }
+    std::string marked;
+    for (const auto& issue : w.view.visibleSpellIssues())
+        marked += w.text().substr(issue.first, issue.second - issue.first) + " ";
+    c.check(marked == "Strase niemmand ", "spell: typos underlined, markup/elements/names skipped", marked);
+    size_t b = 0, e = 0;
+    c.check(docops::findSpellingError(w.doc, 0, &b, &e) && w.text().substr(b, e - b) == "Strase",
+            "spell: next error (F7)");
+
+    Fixture r("");
+    typeWithAutoCorrect(r, "@alice geht. ", "de-DE");
+    c.check(r.text() == "@alice geht. ", "autocorrect: element markers stay untouched", r.text());
+}
+
 }  // namespace
 
 int runEditingSelfTest(const std::string& reportPath) {
@@ -306,6 +457,9 @@ int runEditingSelfTest(const std::string& reportPath) {
     testMarkers(c);
     testUndoAndClipboard(c);
     testLayout(c);
+    testSpelling(c);
+    testAutoCorrect(c);
+    testRulerFormat(c);
     c.os << "---------------------\n" << c.passed << " ok, " << c.failed << " fehlgeschlagen\n";
 
     theme::fonts() = savedFonts;

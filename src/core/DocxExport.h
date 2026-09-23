@@ -21,7 +21,9 @@ struct DocxOptions {
     std::string font = "Georgia";
     float sizePt = 12.0f;
     float lineSpacing = 1.15f;
-    float marginCm = 2.5f;
+    float marginCm = 2.5f;       // oben und unten
+    float marginLeftCm = 2.5f;
+    float marginRightCm = 2.5f;
     float pageWidthCm = 21.0f;
     float pageHeightCm = 29.7f;
 };

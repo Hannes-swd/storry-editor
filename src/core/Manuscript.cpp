@@ -94,28 +94,80 @@ bool isHeadingStart(const std::string& text, size_t i) {
            (text[i + 1] == '#' || text[i + 1] == ' ');
 }
 
-// Steht am Zeilenende eine Ausrichtungsmarke? Liefert ihren Anfang.
-LineAlign alignSuffix(const std::string& text, size_t lineBegin, size_t lineEnd,
-                      size_t* markerBegin) {
-    struct Known {
-        const char* marker;
-        LineAlign align;
-    };
-    static const Known known[] = {{"%%center%%", LineAlign::Center},
-                                  {"%%right%%", LineAlign::Right},
-                                  {"%%justify%%", LineAlign::Justify},
-                                  {"%%left%%", LineAlign::Left}};
+LineAlign alignFromName(const std::string& name) {
+    if (name == "center") return LineAlign::Center;
+    if (name == "right") return LineAlign::Right;
+    if (name == "justify") return LineAlign::Justify;
+    return LineAlign::Left;
+}
+
+// "%%pf:align=center;left=1.5;right=0;first=-0.63;tabs=2.5,5%%" (ohne die %%)
+void parseParagraphBody(const std::string& body, ParagraphFormat& f) {
+    size_t i = 0;
+    while (i < body.size()) {
+        size_t semi = body.find(';', i);
+        if (semi == std::string::npos) semi = body.size();
+        const std::string item = body.substr(i, semi - i);
+        const size_t eq = item.find('=');
+        if (eq != std::string::npos) {
+            const std::string key = item.substr(0, eq);
+            const std::string value = item.substr(eq + 1);
+            if (key == "align") {
+                f.align = alignFromName(value);
+            } else if (key == "left") {
+                f.left = static_cast<float>(std::atof(value.c_str()));
+            } else if (key == "right") {
+                f.right = static_cast<float>(std::atof(value.c_str()));
+            } else if (key == "first") {
+                f.first = static_cast<float>(std::atof(value.c_str()));
+            } else if (key == "tabs") {
+                size_t t = 0;
+                while (t < value.size()) {
+                    size_t comma = value.find(',', t);
+                    if (comma == std::string::npos) comma = value.size();
+                    const float pos = static_cast<float>(std::atof(value.substr(t, comma - t).c_str()));
+                    if (pos > 0.0f) f.tabs.push_back(pos);
+                    t = comma + 1;
+                }
+                std::sort(f.tabs.begin(), f.tabs.end());
+            }
+        }
+        i = semi + 1;
+    }
+}
+
+// Steht am Zeilenende eine Absatzmarke (Ausrichtung, Einzuege, Tabstopps)?
+// Liefert ihren Anfang und fuellt `format`.
+bool paragraphSuffix(const std::string& text, size_t lineBegin, size_t lineEnd, size_t* markerBegin,
+                     ParagraphFormat* format) {
     size_t end = lineEnd;
     if (end > lineBegin && text[end - 1] == '\r') --end;
-    for (const Known& k : known) {
-        const size_t len = std::char_traits<char>::length(k.marker);
-        if (end - lineBegin >= len && text.compare(end - len, len, k.marker) == 0) {
-            if (markerBegin) *markerBegin = end - len;
-            return k.align;
-        }
-    }
     if (markerBegin) *markerBegin = lineEnd;
-    return LineAlign::Left;
+    if (end - lineBegin < 4 || text.compare(end - 2, 2, "%%") != 0) return false;
+    // Anfang der letzten %%...%%-Marke der Zeile
+    const size_t open = end - 2 > lineBegin ? text.rfind("%%", end - 3) : std::string::npos;
+    if (open == std::string::npos || open < lineBegin || open + 4 > end) return false;
+    const std::string body = text.substr(open + 2, end - 2 - open - 2);
+    ParagraphFormat f;
+    if (body.rfind("pf:", 0) == 0) {
+        parseParagraphBody(body.substr(3), f);
+    } else if (body == "center" || body == "right" || body == "justify" || body == "left") {
+        f.align = alignFromName(body);
+    } else {
+        return false;
+    }
+    if (markerBegin) *markerBegin = open;
+    if (format) *format = f;
+    return true;
+}
+
+std::string formatCm(float v) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.2f", v);
+    std::string s = buf;
+    while (!s.empty() && s.back() == '0') s.pop_back();
+    if (!s.empty() && s.back() == '.') s.pop_back();
+    return s == "-0" ? "0" : s;
 }
 
 bool isHexColor(const std::string& s) {
@@ -242,7 +294,7 @@ std::vector<ManuscriptToken> parseManuscript(const Project& p, const std::string
         if (isHeadingStart(text, i)) {
             const size_t lineEnd = lineEndOf(text, i);
             size_t markerBegin = lineEnd;
-            alignSuffix(text, i, lineEnd, &markerBegin);
+            paragraphSuffix(text, i, lineEnd, &markerBegin, nullptr);
             flushText(i);
             ManuscriptToken t;
             t.kind = ManuscriptToken::Kind::Heading;
@@ -538,7 +590,8 @@ std::vector<ManuscriptLine> manuscriptLines(const std::string& text) {
         if (L.kind == LineKind::Body || L.kind == LineKind::Heading || L.kind == LineKind::Bullet ||
             L.kind == LineKind::Numbered) {
             size_t markerBegin = L.contentEnd;
-            L.align = alignSuffix(text, L.contentBegin, e, &markerBegin);
+            paragraphSuffix(text, L.contentBegin, e, &markerBegin, &L.format);
+            L.align = L.format.align;
             if (markerBegin < L.contentEnd) L.contentEnd = markerBegin;
         }
         if (L.contentEnd < L.contentBegin) L.contentEnd = L.contentBegin;
@@ -573,6 +626,23 @@ std::string linePrefix(LineKind kind, int level) {
         case LineKind::Numbered: return "1. ";
         default: return std::string();
     }
+}
+
+std::string paragraphMarker(const ParagraphFormat& f) {
+    if (f.left == 0.0f && f.right == 0.0f && f.first == 0.0f && f.tabs.empty()) return alignMarker(f.align);
+    std::string body = "pf:";
+    static const char* names[] = {"left", "center", "right", "justify"};
+    if (f.align != LineAlign::Left) body += std::string("align=") + names[static_cast<int>(f.align)] + ";";
+    if (f.left != 0.0f) body += "left=" + formatCm(f.left) + ";";
+    if (f.right != 0.0f) body += "right=" + formatCm(f.right) + ";";
+    if (f.first != 0.0f) body += "first=" + formatCm(f.first) + ";";
+    if (!f.tabs.empty()) {
+        body += "tabs=";
+        for (size_t i = 0; i < f.tabs.size(); ++i) body += (i ? "," : "") + formatCm(f.tabs[i]);
+        body += ";";
+    }
+    body.pop_back();
+    return "%%" + body + "%%";
 }
 
 std::string alignMarker(LineAlign align) {

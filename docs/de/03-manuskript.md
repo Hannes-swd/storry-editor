@@ -56,7 +56,7 @@ Registerkarten. Das Pfeilchen ganz rechts klappt das Band ein und aus.
 | **Start** | Zwischenablage, Schriftart, Absatz, Formatvorlagen, Suchen |
 | **Einfügen** | Figuren, Werte, Aktionen, Zeitpunkte, Szenenwechsel, Lesezeichen, Kommentare |
 | **Layout** | Seitenränder, Papierformat, Zeilenabstand, Grundschrift, Seiten oder Endlos |
-| **Überprüfen** | Kommentare anlegen und durchgehen, Lesezeichen, Wörter zählen |
+| **Überprüfen** | Rechtschreibung, AutoKorrektur, Sprache, Kommentare, Lesezeichen, Wörter zählen |
 | **Ansicht** | Lesemodus, Lineal, Navigationsbereich, Zoom, geteilte Ansicht, Fokus |
 
 > 💡 Das Programm merkt sich, welche Registerkarte zuletzt offen war.
@@ -213,6 +213,41 @@ Ist einer markiert, lässt er sich dort auch bearbeiten und löschen.
 
 ---
 
+## 3.6a Rechtschreibung und AutoKorrektur
+
+Wie in Word: Unbekannte Wörter bekommen eine **rote Welle**. Das Wort, an dem du gerade
+tippst, bleibt frei, bis du fertig bist.
+
+| | |
+|:--|:--|
+| **Rechtsklick** auf ein rotes Wort | Vorschläge – ein Klick setzt sie ein. Dazu **Alle ignorieren** (bis zum Neustart) und **Zum Wörterbuch hinzufügen** (dauerhaft) |
+| <kbd>F7</kbd> oder **Überprüfen → Nächster Fehler** | Springt zum nächsten unbekannten Wort und markiert es |
+| **Überprüfen → Rechtschreibung** | Die Wellen ein- und ausschalten |
+| **Überprüfen → AutoKorrektur** | Korrigieren beim Tippen ein- und ausschalten |
+| **Sprache** (Menüband oder Statusleiste) | **Deutsch** oder **Englisch** – unter „Varianten" auch z. B. Englisch (UK) oder Deutsch (Schweiz) |
+
+Die **AutoKorrektur** greift, sobald ein Wort fertig ist:
+
+| Du tippst | Es wird |
+|:--|:--|
+| `das ist gut. hier` | `Das ist gut. Hier` – Satzanfang groß (nicht nach „z.B.", „usw." …) |
+| `DIese` | `Diese` |
+| `"Hallo"` · `geht's` | `„Hallo“` · `geht’s` (Englisch: “Hello”) |
+| `...` · `Wort - Wort` | `…` · `Wort – Wort` |
+| bekannte Tippfehler | die Korrektur aus der Windows‑Liste |
+
+Gefällt dir eine Korrektur nicht, drück direkt danach <kbd>Strg</kbd>+<kbd>Z</kbd> – nur
+die Korrektur verschwindet, dein Getipptes bleibt.
+
+> 💡 Die Wörterbücher kommen von **Windows** – dieselben wie in Edge. Welche Sprachen es
+> gibt, legst du unter *Einstellungen → Zeit und Sprache → Sprache und Region* fest.
+> Fehlt eine, zeigt die Statusleiste den Sprachnamen gelb. Die Namen deiner Figuren,
+> Orte und Dinge gelten automatisch als richtig; `@`‑Marken werden nie geprüft.
+> Eigene Wörter stehen in `woerterbuch.txt` im Einstellungsordner – dein
+> Windows‑Wörterbuch bleibt unberührt.
+
+---
+
 ## 3.7 Der Navigationsbereich
 
 Links steht die Gliederung deines Textes: Titel und Kapitel fett, Szenen eingerückt,
@@ -250,10 +285,36 @@ Aus- und einblenden kannst du ihn über **Ansicht → Navigationsbereich**.
 | **Layout → Seitenränder / Format** | Rand (schmal bis breit) und Papier (A4, A5, Letter) |
 | **Layout → Zeilenabstand, Grundschrift, Größe** | Gilt für das ganze Manuskript – auch in der Word‑Datei |
 | **Layout / Ansicht → Seiten oder Endlos** | Einzelne Blätter wie auf Papier oder ein durchgehendes Blatt über die ganze Breite |
-| **Ansicht → Lineal** | Zentimeter‑Lineal mit den Rändern über der Seite |
+| **Ansicht → Lineal** | Zentimeter‑Lineal über der Seite – mit der Maus bedienbar, siehe unten |
 | **Ansicht → Zoom** | 50 % bis 300 %, „Eine Seite", „Seitenbreite" – oder <kbd>Strg</kbd>+Mausrad |
 | **Ansicht → Teilen** | Zwei Stellen desselben Textes übereinander, z. B. oben Kapitel 1 lesen, unten Kapitel 12 schreiben. Die Trennlinie lässt sich ziehen |
 | **Ansicht → Fokus** | Nur noch das Blatt – Menüband, Lineal und Navigationsbereich verschwinden |
+
+### Das Lineal
+
+```
+   grau │ weiß (Textbereich)                                  │ grau
+ ───────┼──▽──────────L──────────L──────────────────────────△──┼───────
+        │  △  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16  │
+        │  ▭                                                   │
+   Seitenrand   Tabstopps                          Einzug rechts
+```
+
+| Was | Wirkung |
+|:--|:--|
+| **▽ oben links** | Einzug der ersten Zeile – z. B. 1,25 cm für den klassischen Romaneinzug |
+| **△ unten links** | Hängender Einzug: der Absatz rückt ein, die erste Zeile bleibt stehen |
+| **▭ Kästchen darunter** | Verschiebt den ganzen Absatz samt erster Zeile |
+| **△ rechts** | Einzug rechts |
+| **Klick ins Lineal** | Setzt einen **Tabstopp** (L‑Zeichen). Ziehen verschiebt ihn, nach unten aus dem Lineal ziehen entfernt ihn |
+| **Grenze grau/weiß** | Verschiebt den linken bzw. rechten **Seitenrand** (gilt für das ganze Manuskript) |
+
+Einzüge und Tabstopps gelten für den Absatz am Cursor – oder für alle markierten.
+Beim Ziehen zeigt eine gestrichelte Linie auf der Seite, wo es hingeht, und ein Hinweis
+den Wert in Zentimetern. Die Marken rasten in 0,25‑cm‑Schritten ein; mit gedrückter
+<kbd>Alt</kbd>‑Taste geht es frei. Mit <kbd>Tab</kbd> springt der Text zum nächsten
+Tabstopp – ohne eigene Tabstopps wie in Word alle 1,25 cm (die kleinen grauen Striche
+unten im Lineal). <kbd>Enter</kbd> nimmt Einzüge und Tabstopps in den neuen Absatz mit.
 
 Die **Statusleiste** unten zeigt:
 
@@ -333,6 +394,7 @@ gewählt, dass auch Obsidian sie darstellt:
 | `<span style="color:#C00000;background:#FFFF00;font-size:14pt;font-family:Georgia">…</span>` | Farbe, Hervorhebung, Größe, Schriftart |
 | `- Punkt` · `1. Punkt` | Aufzählung, Nummerierung |
 | `…%%center%%` am Zeilenende | Ausrichtung (`center`, `right`, `justify`) |
+| `…%%pf:left=1.5;first=1.25;tabs=5,8%%` am Zeilenende | Absatzformat aus dem Lineal: Einzüge und Tabstopps in cm |
 | `%%bm:Name%%` | Lesezeichen |
 | `%%note:Text%%` | Kommentar |
 | `---` | Szenenwechsel |

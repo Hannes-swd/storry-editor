@@ -75,6 +75,7 @@ add_executable(StoryEditor WIN32
     src/app/Application.cpp
     src/app/Platform.cpp
     src/app/TextureCache.cpp
+    src/app/SpellCheck.cpp
     src/core/StoryTime.cpp
     src/core/Manuscript.cpp
     src/core/DocxExport.cpp
@@ -88,6 +89,7 @@ add_executable(StoryEditor WIN32
     src/ui/UiCommon.cpp
     src/ui/Editor.cpp
     src/ui/Dialogs.cpp
+    src/ui/AutoCorrect.cpp
     src/ui/DocumentView.cpp
     src/ui/EditingSelfTest.cpp
     src/ui/Ribbon.cpp

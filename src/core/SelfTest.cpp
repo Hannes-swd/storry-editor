@@ -641,8 +641,13 @@ void testWordExport(Report& r) {
         "# Das Werk%%center%%\n"
         "Ein <u>Wort</u> in <span style=\"color:#C00000\">Rot</span>.%%center%%\n"
         "- Punkt\n"
-        "Mit %%note:geheim%% Notiz und %%bm:Marke%% Zeichen.";
+        "Mit %%note:geheim%% Notiz und %%bm:Marke%% Zeichen.\n"
+        "Eingerueckt\tmit Tab%%pf:left=1;right=2;first=0.5;tabs=3%%";
     const std::string rich = buildManuscriptDocx(p, std::string());
+    r.check(rich.find("<w:tabs><w:tab w:val=\"left\" w:pos=\"1701\"/></w:tabs><w:ind w:left=\"567\" "
+                      "w:right=\"1134\" w:firstLine=\"283\"/>") != std::string::npos,
+            "docx: indents and tab stops from the ruler");
+    r.check(rich.find("<w:tab/>") != std::string::npos, "docx: tab character");
     r.check(rich.find("<w:pStyle w:val=\"Title\"/><w:jc w:val=\"center\"/></w:pPr><w:r><w:t "
                       "xml:space=\"preserve\">Das Werk") != std::string::npos,
             "docx: title style becomes Word's title, centred");

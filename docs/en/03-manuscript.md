@@ -55,7 +55,7 @@ the far right collapses and expands the ribbon.
 | **Home** | Clipboard, font, paragraph, styles, find |
 | **Insert** | Characters, values, actions, points in time, scene breaks, bookmarks, comments |
 | **Layout** | Margins, paper size, line spacing, base font, pages or continuous |
-| **Review** | Add and walk through comments, bookmarks, word count |
+| **Review** | Spelling, AutoCorrect, language, comments, bookmarks, word count |
 | **View** | Read mode, ruler, navigation pane, zoom, split view, focus |
 
 > 💡 The program remembers which tab was open last.
@@ -213,6 +213,40 @@ selected, you can edit and delete it there as well.
 
 ---
 
+## 3.6a Spelling and AutoCorrect
+
+Like in Word: unknown words get a **red wave**. The word you are typing stays clean until
+you have finished it.
+
+| | |
+|:--|:--|
+| **Right click** on a red word | Suggestions – one click puts them in. Plus **Ignore all** (until restart) and **Add to dictionary** (permanent) |
+| <kbd>F7</kbd> or **Review → Next error** | Jumps to the next unknown word and selects it |
+| **Review → Spelling** | Turn the waves on and off |
+| **Review → AutoCorrect** | Turn correcting while typing on and off |
+| **Language** (ribbon or status bar) | **German** or **English** – "Variants" also offers e.g. English (UK) or German (Switzerland) |
+
+**AutoCorrect** kicks in as soon as a word is finished:
+
+| You type | It becomes |
+|:--|:--|
+| `this is good. here` | `This is good. Here` – sentence start capitalised (not after "e.g.", "etc." …) |
+| `THis` | `This` |
+| `"Hello"` · `it's` | `“Hello”` · `it’s` (German: „Hallo“) |
+| `...` · `word - word` | `…` · `word – word` |
+| known typos | the correction from the Windows list |
+
+Don't like a correction? Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> right afterwards – only the
+correction goes away, what you typed stays.
+
+> 💡 The dictionaries come from **Windows** – the same as in Edge. Which languages exist is
+> set under *Settings → Time & language → Language & region*. If one is missing, the
+> status bar shows the language name in yellow. The names of your characters, places and
+> things count as correct automatically; `@` markers are never checked. Your own words
+> live in `woerterbuch.txt` in the settings folder – your Windows dictionary is untouched.
+
+---
+
 ## 3.7 The navigation pane
 
 On the left is the outline of your text: title and chapters in bold, scenes indented,
@@ -250,10 +284,36 @@ shows a bar above the page.
 | **Layout → Margins / Size** | Margin (narrow to wide) and paper (A4, A5, Letter) |
 | **Layout → Line spacing, base font, size** | For the whole manuscript – also in the Word file |
 | **Layout / View → Pages or continuous** | Separate sheets like on paper, or one continuous sheet across the full width |
-| **View → Ruler** | Centimetre ruler with the margins above the page |
+| **View → Ruler** | Centimetre ruler above the page – works with the mouse, see below |
 | **View → Zoom** | 50 % to 300 %, "One page", "Page width" – or <kbd>Ctrl</kbd>+mouse wheel |
 | **View → Split** | Two places of the same text one above the other, e.g. read chapter 1 at the top while writing chapter 12 below. Drag the divider to resize |
 | **View → Focus** | Just the page – ribbon, ruler and navigation pane disappear |
+
+### The ruler
+
+```
+   grey │ white (text area)                                   │ grey
+ ───────┼──▽──────────L──────────L──────────────────────────△──┼───────
+        │  △  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16  │
+        │  ▭                                                   │
+     margin     tab stops                            right indent
+```
+
+| What | Effect |
+|:--|:--|
+| **▽ top left** | First line indent – e.g. 1.25 cm for the classic novel indent |
+| **△ bottom left** | Hanging indent: the paragraph moves in, the first line stays put |
+| **▭ box below** | Moves the whole paragraph including the first line |
+| **△ right** | Right indent |
+| **Click on the ruler** | Sets a **tab stop** (L mark). Drag to move it, drag it down off the ruler to remove it |
+| **Grey/white border** | Moves the left or right **page margin** (for the whole manuscript) |
+
+Indents and tab stops apply to the paragraph at the cursor – or to all selected ones.
+While dragging, a dashed line on the page shows where it goes and a tip shows the value
+in centimetres. Markers snap to 0.25 cm; hold <kbd>Alt</kbd> for free positioning.
+<kbd>Tab</kbd> jumps to the next tab stop – without your own stops, every 1.25 cm like in
+Word (the small grey ticks at the bottom of the ruler). <kbd>Enter</kbd> carries indents
+and tab stops over to the new paragraph.
 
 The **status bar** at the bottom shows:
 
@@ -333,6 +393,7 @@ Obsidian displays them too:
 | `<span style="color:#C00000;background:#FFFF00;font-size:14pt;font-family:Georgia">…</span>` | Colour, highlight, size, font |
 | `- item` · `1. item` | Bullets, numbering |
 | `…%%center%%` at the end of a line | Alignment (`center`, `right`, `justify`) |
+| `…%%pf:left=1.5;first=1.25;tabs=5,8%%` at the end of a line | Paragraph format from the ruler: indents and tab stops in cm |
 | `%%bm:Name%%` | Bookmark |
 | `%%note:Text%%` | Comment |
 | `---` | Scene break |

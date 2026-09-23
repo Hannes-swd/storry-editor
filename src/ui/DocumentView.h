@@ -36,10 +36,15 @@ struct DocOptions {
     float zoom = 1.0f;
     float pageWidthCm = 21.0f;
     float pageHeightCm = 29.7f;
-    float marginCm = 2.5f;
+    float marginCm = 2.5f;        // oben und unten
+    float marginLeftCm = 2.5f;
+    float marginRightCm = 2.5f;
     std::string font = "Georgia";
     float fontPt = 12.0f;
     float lineSpacing = 1.15f;
+    bool spellCheck = false;   // rote Wellen unter unbekannten Woertern
+    bool autoCorrect = false;  // AutoKorrektur beim Tippen
+    std::string language = "de-DE";
 };
 
 struct DocHighlight {
@@ -56,6 +61,9 @@ struct DocEvent {
     size_t pos = 0;     // Anfang der Marke im Quelltext
     size_t end = 0;
     std::string text;   // Kommentartext
+    // Rechtsklick auf ein rot markiertes Wort
+    size_t spellBegin = 0, spellEnd = 0;
+    std::string spellWord;
 };
 
 // --------------------------------------------------------------- Zeilenmodell
@@ -70,6 +78,7 @@ struct LineModel {
     LineKind kind = LineKind::Body;
     int level = 0;
     LineAlign align = LineAlign::Left;
+    ParagraphFormat format;  // Einzuege und Tabstopps (align steht oben)
     std::string prefix;      // "- ", "1. " ... wie er im Text stand
     std::string atomicRaw;   // Zeit- und Trennzeilen bleiben unveraendert
     std::vector<StyledUnit> units;
@@ -167,9 +176,10 @@ public:
     DocEvent draw(ManuscriptDoc& doc, const DocOptions& options, ImVec2 size,
                   const std::vector<DocHighlight>& highlights, bool claimKeys);
 
-    // Lineal ueber der Ansicht: Zentimeter, Raender - zeichnet sich an die
-    // Stelle des Cursors und belegt `height` Pixel.
-    void drawRuler(const DocOptions& options, float height);
+    // Lineal ueber der Ansicht: Zentimeter, Raender, Einzuege und Tabstopps
+    // des Absatzes am Cursor - alles mit der Maus verschiebbar. Belegt
+    // `height` Pixel an der aktuellen Stelle.
+    void drawRuler(ManuscriptDoc& doc, const DocOptions& options, float height);
 
     // Zustand nach dem letzten draw()
     bool focused() const { return focused_; }
@@ -179,12 +189,15 @@ public:
     int pageCount() const { return pageCount_; }
     int caretPage() const { return caretPage_; }
     float lastViewWidth() const { return viewWidth_; }
+    // Rot markierte Stellen im sichtbaren Bereich (Quelltext-Bereiche) - fuer den Selbsttest.
+    std::vector<std::pair<size_t, size_t>> visibleSpellIssues() const;
 
     // Zoom so, dass die Seite in die Breite passt (fuer "Seitenbreite").
     float zoomForPageWidth(const DocOptions& options) const;
     float zoomForWholePage(const DocOptions& options) const;
 
 private:
+    struct LineLayout;
     struct Stop {
         size_t pos = 0;
         float x = 0.0f;
@@ -212,6 +225,8 @@ private:
         float left = 0.0f, right = 0.0f;            // Inhaltsbereich der Zeile
         int page = 0;
         int line = -1;
+        LineLayout* layout = nullptr;  // Textzeile aus dem Zeilen-Cache
+        size_t lineBegin = 0;
         size_t firstStop = 0, stopCount = 0;
         size_t firstFrag = 0, fragCount = 0;
     };
@@ -231,6 +246,11 @@ private:
         std::deque<std::string> labels;
         float spaceBefore = 0.0f, spaceAfter = 0.0f;
         uint64_t lastUsed = 0;
+        // Rechtschreibung: sichtbarer Text der Zeile und woher jedes Byte kommt
+        std::string plain;
+        std::vector<uint32_t> plainPos;            // relativ zum Zeilenanfang
+        std::vector<std::pair<uint32_t, uint32_t>> spellIssues;  // relativ
+        uint64_t spellGeneration = 0;
     };
 
     void layout(ManuscriptDoc& doc, const DocOptions& options, float viewWidth);
@@ -266,6 +286,7 @@ private:
     std::vector<size_t> lineBegins_;
     float docWidth_ = 0.0f, docHeight_ = 0.0f;
     float pageLeft_ = 0.0f, pageWidthPx_ = 0.0f, pageHeightPx_ = 0.0f, marginPx_ = 0.0f;
+    float marginLeftPx_ = 0.0f, marginRightPx_ = 0.0f;
     float pageGap_ = 0.0f;
     int pageCount_ = 1;
 
@@ -279,6 +300,10 @@ private:
     float caretHeight_ = 0.0f;
     int caretPage_ = 0;
     ImVec2 rulerOrigin_ = ImVec2(0, 0);
+    ImVec2 viewMin_ = ImVec2(0, 0), viewMax_ = ImVec2(0, 0);  // Schreibfeld auf dem Bildschirm
+    enum class RulerDrag { None, MarginLeft, MarginRight, First, Hanging, LeftBoth, Right, Tab };
+    RulerDrag rulerDrag_ = RulerDrag::None;
+    float rulerTabFrom_ = 0.0f;  // welcher Tabstopp gezogen wird
 };
 
 // --------------------------------------------------------------- Bearbeiten
@@ -312,6 +337,9 @@ TextStyle caretStyle(ManuscriptDoc& doc, DocumentView& view);
 // Absatzformat der betroffenen Zeilen
 void setLineKind(ManuscriptDoc& doc, DocumentView& view, LineKind kind, int level);
 void setAlign(ManuscriptDoc& doc, DocumentView& view, LineAlign align);
+// Einzuege/Tabstopps aller betroffenen Absaetze aendern (ein Undo-Schritt).
+void setParagraphFormat(ManuscriptDoc& doc, DocumentView& view,
+                        const std::function<void(ParagraphFormat&)>& change);
 const ManuscriptLine* caretLine(ManuscriptDoc& doc, DocumentView& view);
 
 // Zwischenablage
@@ -319,6 +347,9 @@ void copy(ManuscriptDoc& doc, DocumentView& view);
 void cut(ManuscriptDoc& doc, DocumentView& view);
 void paste(ManuscriptDoc& doc, DocumentView& view);
 std::string selectedPlainText(ManuscriptDoc& doc, DocumentView& view);
+
+// Naechstes unbekanntes Wort ab `from` (mit Umlauf zum Anfang).
+bool findSpellingError(ManuscriptDoc& doc, size_t from, size_t* begin, size_t* end);
 
 // Ersetzt einen Quelltextbereich (Suchen/Ersetzen) - mit Undo.
 void replaceRaw(ManuscriptDoc& doc, DocumentView& view, size_t begin, size_t end,

@@ -379,6 +379,8 @@ bool save() {
                      {"font_size", s.docFontSize},
                      {"line_spacing", s.docLineSpacing},
                      {"margin_cm", s.docMarginCm},
+                     {"margin_left_cm", s.docMarginLeftCm},
+                     {"margin_right_cm", s.docMarginRightCm},
                      {"page_format", s.docPageFormat},
                      {"page_view", s.docPageView},
                      {"zoom", s.docZoom},
@@ -386,7 +388,10 @@ bool save() {
                      {"outline", s.docShowOutline},
                      {"marks", s.docShowMarks},
                      {"ribbon_collapsed", s.docRibbonCollapsed},
-                     {"ribbon_tab", s.docRibbonTab}};
+                     {"ribbon_tab", s.docRibbonTab},
+                     {"spell_check", s.docSpellCheck},
+                     {"auto_correct", s.docAutoCorrect},
+                     {"language", s.docLanguage}};
     j["last_vault"] = s.lastVault;
     j["last_project_name"] = s.lastProjectName;
     j["windows"] = {{"manuscript", s.showManuscript}, {"timeline", s.showTimeline}, {"groups", s.showGroups},
@@ -461,6 +466,9 @@ bool load() {
         s.docFontSize = std::clamp(d.value("font_size", s.docFontSize), 6.0f, 72.0f);
         s.docLineSpacing = std::clamp(d.value("line_spacing", s.docLineSpacing), 0.8f, 3.0f);
         s.docMarginCm = std::clamp(d.value("margin_cm", s.docMarginCm), 0.5f, 6.0f);
+        // Aeltere Einstellungen kennen nur einen Rand fuer alle Seiten.
+        s.docMarginLeftCm = std::clamp(d.value("margin_left_cm", s.docMarginCm), 0.0f, 10.0f);
+        s.docMarginRightCm = std::clamp(d.value("margin_right_cm", s.docMarginCm), 0.0f, 10.0f);
         s.docPageFormat = std::clamp(d.value("page_format", s.docPageFormat), 0, 2);
         s.docPageView = d.value("page_view", s.docPageView);
         s.docZoom = std::clamp(d.value("zoom", s.docZoom), 0.3f, 4.0f);
@@ -469,6 +477,9 @@ bool load() {
         s.docShowMarks = d.value("marks", s.docShowMarks);
         s.docRibbonCollapsed = d.value("ribbon_collapsed", s.docRibbonCollapsed);
         s.docRibbonTab = std::clamp(d.value("ribbon_tab", s.docRibbonTab), 0, 5);
+        s.docSpellCheck = d.value("spell_check", s.docSpellCheck);
+        s.docAutoCorrect = d.value("auto_correct", s.docAutoCorrect);
+        s.docLanguage = d.value("language", s.docLanguage);
     }
     s.lastVault = j.value("last_vault", s.lastVault);
     s.lastProjectName = j.value("last_project_name", s.lastProjectName);

@@ -289,6 +289,8 @@ void Editor::exportManuscriptToWord(const std::string& path) {
     options.sizePt = s.docFontSize;
     options.lineSpacing = s.docLineSpacing;
     options.marginCm = s.docMarginCm;
+    options.marginLeftCm = s.docMarginLeftCm;
+    options.marginRightCm = s.docMarginRightCm;
     theme::pageSizeCm(s.docPageFormat, &options.pageWidthCm, &options.pageHeightCm);
     if (exportManuscriptDocx(project, target, &err, options))
         setStatus(TR("Word-Datei geschrieben: ") + target);

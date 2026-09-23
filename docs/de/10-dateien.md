@@ -106,7 +106,8 @@ Was dabei entsteht:
 | `!act:…` | **weg** |
 | Lesezeichen, Kommentare | **weg** |
 | jede Zeile | ein Absatz – wie auf der Seite im Editor |
-| Grundschrift, Zeilenabstand, Ränder, Papierformat | aus **Layout** |
+| Einzüge und Tabstopps aus dem Lineal | echte Word‑Einzüge und ‑Tabstopps |
+| Grundschrift, Zeilenabstand, Ränder, Papierformat | aus **Layout** und dem Lineal |
 
 Die Datei ist ein normales `.docx` und lässt sich mit Word, LibreOffice oder Google
 Docs öffnen. Du brauchst kein Word installiert zu haben – das Programm baut das Paket

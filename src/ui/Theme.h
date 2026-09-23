@@ -67,7 +67,9 @@ struct AppSettings {
     std::string docFont = "Georgia";
     float docFontSize = 12.0f;     // Punkt
     float docLineSpacing = 1.15f;
-    float docMarginCm = 2.5f;
+    float docMarginCm = 2.5f;       // oben und unten
+    float docMarginLeftCm = 2.5f;   // im Lineal verschiebbar
+    float docMarginRightCm = 2.5f;
     int docPageFormat = 0;         // 0 = A4, 1 = A5, 2 = Letter
     bool docPageView = true;       // Seiten statt Endlosrolle
     float docZoom = 1.0f;
@@ -75,7 +77,10 @@ struct AppSettings {
     bool docShowOutline = true;
     bool docShowMarks = true;
     bool docRibbonCollapsed = false;
-    int docRibbonTab = 1;          // zuletzt gewaehlte Registerkarte (1 = Start)
+    int docRibbonTab = 1;
+    bool docSpellCheck = true;       // rote Wellen unter Tippfehlern
+    bool docAutoCorrect = true;      // AutoKorrektur beim Tippen
+    std::string docLanguage = "de";  // Sprache des Textes: "de", "en" oder ein Tag wie "en-GB"          // zuletzt gewaehlte Registerkarte (1 = Start)
     std::string lastVault;
     std::string lastProjectName;
 
