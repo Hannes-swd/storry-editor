@@ -98,7 +98,7 @@ void loadFonts() {
 
     auto tryLoad = [&](const char* path) -> ImFont* {
         if (!path || GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) return nullptr;
-        return io.Fonts->AddFontFromFileTTF(path, size);
+        return theme::addFontWithFallback(path, size);
     };
 
     theme::Fonts& out = theme::fonts();

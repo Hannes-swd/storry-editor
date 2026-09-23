@@ -121,6 +121,10 @@ struct Fonts {
 Fonts& fonts();
 ImFont* fontFor(bool bold, bool italic);
 
+// Laedt eine Schrift und mischt Segoe UI Symbol als Ersatz dazu, damit Zeichen
+// wie ▸ → • „ … auch in Schriften erscheinen, die sie selbst nicht haben.
+ImFont* addFontWithFallback(const char* path, float size);
+
 // Schriftarten fuer das Manuskript. Eine Familie wird erst geladen, wenn sie
 // zum ersten Mal gebraucht wird; bis dahin liefert familyFont() die
 // Oberflaechenschrift. Das Nachladen passiert zwischen zwei Frames.

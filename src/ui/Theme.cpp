@@ -173,6 +173,25 @@ std::string fontPath(const char* file) { return std::string("C:/Windows/Fonts/")
 
 bool fileExists(const std::string& path) { return platform::lastWriteTime(path) != 0; }
 
+}  // namespace
+
+ImFont* addFontWithFallback(const char* path, float size) {
+    ImGuiIO& io = ImGui::GetIO();
+    ImFont* font = io.Fonts->AddFontFromFileTTF(path, size);
+    if (!font) return nullptr;
+    // Die zuerst geladene Schrift gewinnt; das Symbol-Font fuellt nur Luecken.
+    const std::string symbols = fontPath("seguisym.ttf");
+    if (fileExists(symbols)) {
+        ImFontConfig cfg;
+        cfg.MergeMode = true;
+        cfg.DstFont = font;
+        io.Fonts->AddFontFromFileTTF(symbols.c_str(), size, &cfg);
+    }
+    return font;
+}
+
+namespace {
+
 const FamilyFiles* findFamily(const std::string& name) {
     for (const FamilyFiles& f : kFamilies) {
         if (name == f.name) return &f;
@@ -217,7 +236,6 @@ uint64_t& fontGenerationCounter() {
 uint64_t fontGeneration() { return fontGenerationCounter(); }
 
 void loadPendingFonts() {
-    ImGuiIO& io = ImGui::GetIO();
     for (auto& kv : loadedFamilies()) {
         LoadedFamily& lf = kv.second;
         if (!lf.requested || lf.loaded) continue;
@@ -229,7 +247,7 @@ void loadPendingFonts() {
             if (!files->files[k] || !files->files[k][0]) continue;
             const std::string path = fontPath(files->files[k]);
             if (!fileExists(path)) continue;
-            lf.fonts[k] = io.Fonts->AddFontFromFileTTF(path.c_str(), settings().fontSize);
+            lf.fonts[k] = addFontWithFallback(path.c_str(), settings().fontSize);
         }
     }
 }
